@@ -33,6 +33,14 @@ h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 </style>
 </head>
 <body><main>
+<div id="prep" class="item" hidden></div>
+<section id="setup" hidden>
+  <h1>Bem-vindo ao dumpbox</h1>
+  <p class="m">Crie a senha do app (mínimo 8 caracteres). Ela fica só neste PC.</p>
+  <input id="nsenha" type="password" placeholder="nova senha" autocomplete="new-password">
+  <input id="nsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" style="margin-top:8px">
+  <button id="criar">Criar senha e entrar</button><div id="serr" class="m"></div>
+</section>
 <section id="login" hidden>
   <h1>dumpbox</h1>
   <input id="senha" type="password" placeholder="senha" autocomplete="current-password">

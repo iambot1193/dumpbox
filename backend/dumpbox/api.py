@@ -1,5 +1,6 @@
 """API + PWA. Rodar: uvicorn dumpbox.api:app --host 127.0.0.1 --port 8000 (expor só via Tailscale)."""
 import os
+import sys
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -10,17 +11,17 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, chat, classifier, db
+from . import auth, chat, classifier, db, ollama_mgr, setup
 
-WEB = Path(__file__).resolve().parents[2] / "web"
-MODELO = os.getenv("DUMPBOX_MODEL", "qwen2.5:7b")
+# no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
+WEB = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "web"
 
 
 def processar_pendentes(c) -> int:
     """Classifica capturas pendentes, uma por vez. Retorna quantas processou."""
     n = 0
     for row in c.execute("SELECT id, texto FROM captura WHERE status='pendente' ORDER BY criado_em").fetchall():
-        r = classifier.classificar(row["texto"], datetime.now(), MODELO)
+        r = classifier.classificar(row["texto"], datetime.now(), ollama_mgr.modelo())
         db.salvar_resultado(c, row["id"], r)
         n += 1
     return n
@@ -30,7 +31,7 @@ def _worker(parar: threading.Event) -> None:
     c = db.conectar()
     while not parar.is_set():
         try:
-            if not processar_pendentes(c):
+            if not ollama_mgr.pronto() or not processar_pendentes(c):  # IA ainda preparando: notas ficam pendentes
                 parar.wait(2)
         except Exception:  # worker nunca morre; erro de uma nota não derruba as outras
             time.sleep(5)
@@ -39,6 +40,8 @@ def _worker(parar: threading.Event) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     parar = threading.Event()
+    if os.getenv("DUMPBOX_AUTOPREPARO") == "1":
+        ollama_mgr.iniciar_em_thread()
     if os.getenv("DUMPBOX_WORKER", "1") == "1":
         threading.Thread(target=_worker, args=(parar,), daemon=True).start()
     yield
@@ -46,6 +49,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="dumpbox", lifespan=lifespan)
+
+
 def conexao():
     c = db.conectar()  # uma conexão por request (threadpool); WAL permite o worker escrever junto
     try:
@@ -70,6 +75,39 @@ class NovaCaptura(BaseModel):
 
 class NovoEstado(BaseModel):
     estado: str = Field(pattern="^(catalogado|feito|arquivado)$")
+
+
+_PROXY = ("x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "tailscale-user-login")
+_setup_lock = threading.Lock()
+
+
+def _e_local(request: Request) -> bool:
+    """Pedido vindo do próprio PC, sem proxy no meio (Tailscale serve/túneis chegam como 127.0.0.1 mas com cabeçalhos)."""
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1") and not any(h in request.headers for h in _PROXY)
+
+
+class NovaSenha(BaseModel):
+    senha: str = Field(min_length=8, max_length=200)
+
+
+@app.get("/api/estado")
+def estado():
+    """Público e sem dados sensíveis: a tela decide entre criar senha, login e app; mostra o progresso da IA."""
+    return {"configurado": bool(os.getenv("DUMPBOX_PASSWORD_HASH")), "preparo": ollama_mgr.ESTADO}
+
+
+@app.post("/api/setup")
+def criar_senha(body: NovaSenha, request: Request, response: Response):
+    """Primeiro uso: só vale enquanto NÃO há senha e só do próprio PC (evita que um visitante via túnel assuma o app)."""
+    with _setup_lock:
+        if os.getenv("DUMPBOX_PASSWORD_HASH"):
+            raise HTTPException(409, "já configurado")
+        if not _e_local(request):
+            raise HTTPException(403, "crie a senha abrindo o app no próprio PC (http://127.0.0.1)")
+        setup.salvar_senha(body.senha)
+    response.set_cookie("sess", auth.novo_token(), httponly=True, samesite="strict", max_age=auth.SESSAO_S)
+    return {"ok": True}
 
 
 @app.post("/api/login")

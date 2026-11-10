@@ -5,7 +5,9 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(os.getenv("DUMPBOX_DB", Path(__file__).resolve().parents[2] / "data" / "private" / "dumpbox.db"))
+from . import config
+
+DB_PATH = Path(os.getenv("DUMPBOX_DB", config.HOME / "dumpbox.db"))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS captura(

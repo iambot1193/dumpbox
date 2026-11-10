@@ -36,6 +36,11 @@ def limite_ok(ip: str, max_tent: int = 5, janela: int = 60) -> bool:
     return len(ts) <= max_tent
 
 
+def trocar_segredo(novo: str) -> None:
+    global _SEGREDO
+    _SEGREDO = novo
+
+
 def _assina(exp: str) -> str:
     return hmac.new(_SEGREDO.encode(), exp.encode(), hashlib.sha256).hexdigest()
 

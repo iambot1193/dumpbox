@@ -14,7 +14,18 @@ async function api(url, body) {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
-function mostra(tela) { $("login").hidden = tela !== "login"; $("app").hidden = tela !== "app"; }
+function mostra(tela) { for (const t of ["setup", "login", "app"]) $(t).hidden = tela !== t; }
+
+// Barra de preparo da IA (1ª execução do exe: baixa o Ollama e o modelo). Notas já podem ser guardadas.
+async function estado() {
+  try {
+    const e = await (await fetch("/api/estado")).json();
+    const p = e.preparo, el = $("prep");
+    el.hidden = p.pronto;
+    if (!p.pronto) el.textContent = p.erro ? `Erro ao preparar a IA: ${p.erro}` : `Preparando a IA (só na primeira vez): ${p.msg || "aguarde"} ${p.pct ? p.pct + "%" : ""}`;
+    return e;
+  } catch { return null; }
+}
 
 async function enviarFila() {
   let fila = lerFila();
@@ -64,13 +75,23 @@ $("entrar").onclick = async () => {
 };
 $("sair").onclick = async () => { await api("/api/logout", {}); mostra("login"); };
 
+$("criar").onclick = async () => {
+  const a = $("nsenha").value, b = $("nsenha2").value;
+  if (a !== b) { $("serr").textContent = "As senhas não conferem."; return; }
+  try { await api("/api/setup", { senha: a }); $("nsenha").value = $("nsenha2").value = ""; iniciar(); }
+  catch (e) { $("serr").textContent = String(e.message) === "403" ? "Crie a senha abrindo o app no próprio PC (http://127.0.0.1:8000)." : "Use pelo menos 8 caracteres."; }
+};
+
 async function iniciar() {
+  const e = await estado();
+  if (e && !e.configurado) return mostra("setup");
   // 401 -> api() já mostrou o login; offline -> segue no app (a fila local guarda as notas)
   try { await api("/api/sessao"); } catch (e) { if (String(e.message) === "401") return; }
   mostra("app"); await enviarFila(); atualizar();
 }
 window.addEventListener("online", () => { enviarFila().then(atualizar); });
 setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); } }, 5000);
+setInterval(() => { if (!$("prep").hidden) estado(); }, 3000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 iniciar();
 

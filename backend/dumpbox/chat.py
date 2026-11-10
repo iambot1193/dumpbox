@@ -13,12 +13,11 @@ from typing import Literal, get_args
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
-from . import db
+from . import db, ollama_mgr
 from .classifier import OLLAMA_URL
 from .rules import resolver_prazo
 from .schema import Contexto
 
-MODELO = os.getenv("DUMPBOX_MODEL", "qwen2.5:7b")
 Prioridade = Literal["alta", "media", "baixa"]
 _DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 _TTL = 900  # proposta expira em 15 min
@@ -70,7 +69,7 @@ def contexto_itens(c, limite: int = 60) -> str:
 
 def _ollama(mensagens: list[dict]) -> str:
     r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=180, json={
-        "model": MODELO, "stream": False, "format": SaidaChat.model_json_schema(),
+        "model": ollama_mgr.modelo(), "stream": False, "format": SaidaChat.model_json_schema(),
         "options": {"temperature": 0, "num_predict": 500}, "messages": mensagens})
     r.raise_for_status()
     return r.json()["message"]["content"]

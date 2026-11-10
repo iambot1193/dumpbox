@@ -12,3 +12,8 @@ local.properties
 build/
 .gradle/
 .idea/
+
+.venv/
+dist/
+*.spec
+build/

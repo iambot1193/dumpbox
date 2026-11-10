@@ -107,6 +107,42 @@ def test_chat():
     assert c.post("/api/chat", json={"mensagem": "x"}).status_code == 503
 
 
+def test_primeiro_uso_e_modelo():
+    from dumpbox import ollama_mgr, setup
+
+    # senha criada pela tela: só sem senha configurada e só do próprio PC (sem cabeçalhos de proxy)
+    original_local, hash_antigo = api._e_local, os.environ.pop("DUMPBOX_PASSWORD_HASH")
+    setup.ARQ = Path(tempfile.mkdtemp()) / "c.env"
+    c = TestClient(api.app)
+    assert c.get("/api/estado").json()["configurado"] is False
+    assert c.post("/api/setup", json={"senha": "12345678"}).status_code == 403  # host 'testclient' não é local
+    api._e_local = lambda r: True
+    assert c.post("/api/setup", json={"senha": "curta"}).status_code == 422
+    assert c.post("/api/setup", json={"senha": "senha-nova-123"}).status_code == 200
+    assert c.get("/api/sessao").status_code == 200  # já entra logado
+    assert c.post("/api/setup", json={"senha": "outra-senha-123"}).status_code == 409  # não dá pra sobrescrever
+    assert setup.ARQ.read_text().startswith("DUMPBOX_PASSWORD_HASH=")
+    assert auth.confere_senha("senha-nova-123", os.environ["DUMPBOX_PASSWORD_HASH"])
+    os.environ["DUMPBOX_PASSWORD_HASH"] = hash_antigo
+    api._e_local = original_local
+
+    class Req:
+        def __init__(self, host, headers):
+            self.client, self.headers = type("C", (), {"host": host})(), headers
+    assert original_local(Req("127.0.0.1", {}))
+    assert not original_local(Req("127.0.0.1", {"tailscale-user-login": "x"}))  # veio por proxy/túnel
+    assert not original_local(Req("127.0.0.1", {"x-forwarded-for": "1.2.3.4"}))
+    assert not original_local(Req("192.168.0.9", {}))
+
+    # modelo conforme a RAM; sem AUTOPREPARO o worker assume Ollama pronto
+    os.environ.pop("DUMPBOX_MODEL", None)
+    ollama_mgr.ram_gb = lambda: 8
+    assert ollama_mgr.escolher_modelo() == "qwen2.5:1.5b"
+    ollama_mgr.ram_gb = lambda: 32
+    assert ollama_mgr.escolher_modelo() == "qwen2.5:7b"
+    assert ollama_mgr.pronto()
+
+
 def test_rate_limit_e_token():
     assert not auth.token_valido("1.abc") and not auth.token_valido(None)
     assert auth.token_valido(auth.novo_token())
@@ -118,5 +154,6 @@ def test_rate_limit_e_token():
 if __name__ == "__main__":
     test_fluxo()
     test_chat()
+    test_primeiro_uso_e_modelo()
     test_rate_limit_e_token()
     print("ok")

@@ -16,6 +16,13 @@ $env:PYTHONPATH = "backend"; python -m dumpbox.setup     # 1x: cria a senha (gra
 tailscale serve --bg 8000                                # depois de instalar o Tailscale: URL HTTPS privada
 ```
 
+### Distribuição: um exe para PC virgem
+- `dumpbox.exe` (PyInstaller, ~14 MB, sem Python) sobe o servidor em 127.0.0.1 e abre o navegador. Dados em `%LOCALAPPDATA%/dumpbox`.
+- **Assistente de primeiro uso:** sem senha configurada, a tela pede para criar uma. `POST /api/setup` só vale **sem senha existente** e **do próprio PC** (host loopback e nenhum cabeçalho de proxy/túnel), para ninguém assumir o app via Tailscale/Cloudflare.
+- **`ollama_mgr.py`:** usa o Ollama se já estiver rodando; senão acha/baixa o zip portátil (1,6 GB), sobe em segundo plano e puxa o modelo (7B com ≥16 GB de RAM, senão 1.5B). Progresso em `GET /api/estado`; até ficar pronto, o worker deixa as notas `pendentes`.
+- Build local `build.ps1`; CI em `.github/workflows/release.yml` roda os testes, gera o exe e anexa à release de tags `v*`.
+- Limites conhecidos: exe não assinado (SmartScreen avisa), possível falso positivo de antivírus, só Windows (no Linux/Mac o dev instala o Ollama), sem retomar download interrompido.
+
 ### Chat (aba "Chat")
 Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). O modelo **só propõe**: cada ação (criar, estado, prazo, contexto, prioridade) é validada pelo servidor (item existe, enum válido, data resolvida por regra) e só é aplicada após **Confirmar** na tela; propostas expiram em 15 min e valem uma vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
 

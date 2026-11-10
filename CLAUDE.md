@@ -5,6 +5,8 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 ## Comandos
 - Testes: `python tests/test_rules.py` e `PYTHONUTF8=1 python tests/test_api.py` (API sem Ollama)
 - Senha (1x): `PYTHONPATH=backend python -m dumpbox.setup` → `data/private/config.env`. Servidor: `.\iniciar.ps1`
+- Exe: `.\build.ps1` → `dist\dumpbox.exe` (PyInstaller; entrada `run.py` → `launcher.py`). 1º uso: tela cria senha (só do PC local) e `ollama_mgr.py` baixa Ollama portátil + modelo por RAM. Release automática: `.github/workflows/release.yml` (tag `v*`).
+- Cuidado: caminhos com `\\` passados por heredoc/python -c chegam colapsados; escreva texto com barras invertidas via Write/Edit.
 - Chat (`chat.py`): modelo só propõe ações, usuário confirma; nunca gravar direto.
 - Avaliar: `python eval/run_eval.py qwen2.5:1.5b` (precisa Ollama: `$env:OLLAMA_MODELS="D:\Ollama\models"; D:\Ollama\ollama.exe serve`)
 - Schema: `PYTHONUTF8=1 PYTHONPATH=backend python -m dumpbox.schema > schema/saida_ia.schema.json`

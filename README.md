@@ -17,13 +17,26 @@ Telegram bot (lembretes/captura) ------------------> mesma fila
 - **A IA não calcula datas.** O modelo copia o trecho (`prazo_texto`); um parser determinístico em pt-BR resolve a data e a prioridade.
 - Saída do modelo forçada por JSON Schema (gerado do Pydantic).
 
-## Instalação (qualquer PC, sem Tailscale)
+## Usar (Windows, sem instalar nada)
+
+1. Baixe o `dumpbox.exe` em [Releases](../../releases) e dê duplo clique.
+2. Se o Windows mostrar "O Windows protegeu seu PC" (o exe não é assinado): **Mais informações → Executar assim mesmo**.
+3. O navegador abre sozinho. Crie uma senha e pronto.
+4. Na **primeira vez** o app baixa o motor de IA (Ollama) e o modelo, com barra de progresso na tela. Precisa de ~10 GB livres e internet. Enquanto isso você já pode guardar notas; elas são classificadas quando a IA ficar pronta.
+
+- **Modelo escolhido pela RAM:** 16 GB ou mais usa `qwen2.5:7b`; menos que isso usa `qwen2.5:1.5b` (mais leve, bem menos preciso; veja o benchmark).
+- **Dados:** `%LOCALAPPDATA%\dumpbox` (banco, senha e modelos). Para desinstalar, apague essa pasta e o exe.
+- Mantenha a janela do dumpbox aberta enquanto usa; fechar encerra o app.
+- Tudo roda local: nenhuma nota sai do seu PC.
+
+## Instalação para desenvolvedores (qualquer SO, sem Tailscale)
 
 ```bash
 pip install -r requirements.txt
 ollama pull qwen2.5:7b                      # PC fraco: qwen2.5:1.5b (menos preciso, ver benchmark)
-PYTHONPATH=backend python -m dumpbox.setup  # cria a senha (grava só o hash em data/private/)
-python -m uvicorn dumpbox.api:app --app-dir backend    # http://127.0.0.1:8000
+python run.py          # sobe o servidor, abre o navegador e prepara Ollama + modelo sozinho
+# ou, com Ollama já instalado: python -m uvicorn dumpbox.api:app --app-dir backend
+.\build.ps1            # gera dist\dumpbox.exe (Windows)
 ```
 
 No Windows, `iniciar.ps1` sobe o Ollama e o servidor juntos (ajuste `OLLAMA_EXE`/`OLLAMA_MODELS` se não for o caminho padrão).

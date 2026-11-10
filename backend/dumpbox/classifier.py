@@ -44,7 +44,9 @@ class Resultado:
 
 def classificar(texto: str, agora: datetime, modelo: str = "qwen2.5:1.5b", tentativas: int = 2) -> Resultado:
     t0, erro = time.perf_counter(), None
-    for _ in range(tentativas):
+    # saída ~150 tokens por linha (um item cada): teto fixo cortava o JSON de colagens longas
+    orcamento = min(3000, max(400, 150 * (texto.count("\n") + 1)))
+    for tentativa in range(tentativas):
         try:
             r = httpx.post(
                 f"{OLLAMA_URL}/api/chat",
@@ -52,7 +54,8 @@ def classificar(texto: str, agora: datetime, modelo: str = "qwen2.5:1.5b", tenta
                     "model": modelo,
                     "stream": False,
                     "format": SaidaIA.model_json_schema(),
-                    "options": {"temperature": 0, "num_predict": 400},
+                    "options": {"temperature": 0, "num_ctx": 8192,
+                                "num_predict": min(4500, orcamento * (tentativa + 1))},  # retry com o dobro
                     "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": texto}],
                 },
                 timeout=120,

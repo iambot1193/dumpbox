@@ -44,6 +44,13 @@ def test_fluxo():
     r = c.get("/api/itens").json()
     assert len(r["itens"]) == 1 and r["itens"][0]["titulo"] == "Pagar luz"
     assert [x["status"] for x in r["revisar"]] == ["falhou"]  # nota que falhou nunca se perde
+    # nota que falhou pode voltar pra fila (e só ela)
+    falhou_id = r["revisar"][0]["id"]
+    assert c.post(f"/api/capturas/{falhou_id}/reprocessar").status_code == 200
+    assert conn.execute("SELECT status FROM captura WHERE id=?", (falhou_id,)).fetchone()[0] == "pendente"
+    assert c.post(f"/api/capturas/{falhou_id}/reprocessar").status_code == 404  # já não está 'falhou'
+    conn.execute("UPDATE captura SET status='falhou' WHERE id=?", (falhou_id,))  # volta ao estado esperado abaixo
+    conn.commit()
     # marcar como feito e validar estado inválido
     iid = r["itens"][0]["id"]
     assert c.post(f"/api/itens/{iid}/estado", json={"estado": "feito"}).status_code == 200

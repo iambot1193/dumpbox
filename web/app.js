@@ -65,7 +65,19 @@ async function atualizar() {
     const { itens, revisar } = await api("/api/itens");
     const el = $("lista"); el.replaceChildren();
     const grupo = (titulo, nos) => { if (!nos.length) return; const h = document.createElement("h2"); h.textContent = titulo; el.append(h, ...nos); };
-    grupo("Revisar", revisar.map(c => { const d = document.createElement("div"); d.className = "item"; d.textContent = `${c.status === "pendente" ? "⏳" : "⚠️"} ${c.texto}`; return d; }));
+    grupo("Revisar", revisar.map(c => {
+      const d = document.createElement("div"); d.className = "item";
+      const t = document.createElement("div"); t.className = "t";
+      t.textContent = `${c.status === "pendente" ? "⏳" : "⚠️"} ${c.texto}`;
+      d.append(t);
+      if (c.status === "falhou") {
+        if (c.erro) t.title = c.erro;
+        const b = document.createElement("button"); b.className = "sec"; b.textContent = "Tentar de novo";
+        b.onclick = async () => { await api(`/api/capturas/${c.id}/reprocessar`, {}); atualizar(); };
+        d.append(b);
+      }
+      return d;
+    }));
     const porCtx = {};
     for (const it of itens) (porCtx[it.contexto || "outro"] ||= []).push(it);
     for (const [ctx, lst] of Object.entries(porCtx)) grupo(ctx, lst.map(linha));

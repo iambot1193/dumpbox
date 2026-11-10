@@ -158,6 +158,16 @@ def mudar_estado(item_id: int, body: NovoEstado, c=Depends(conexao)):
     return {"ok": True}
 
 
+@app.post("/api/capturas/{captura_id}/reprocessar", dependencies=[Depends(exige_login)])
+def reprocessar(captura_id: str, c=Depends(conexao)):
+    """Põe uma captura que falhou de volta na fila (o texto original nunca foi alterado)."""
+    cur = c.execute("UPDATE captura SET status='pendente', erro=NULL WHERE id=? AND status='falhou'", (captura_id,))
+    c.commit()
+    if cur.rowcount == 0:
+        raise HTTPException(404, "captura não encontrada ou não falhou")
+    return {"ok": True}
+
+
 class Turno(BaseModel):
     role: str = Field(pattern="^(user|assistant)$")
     content: str = Field(max_length=2000)

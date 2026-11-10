@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "ItemIA": {
+      "description": "O que o modelo devolve. Data é só o trecho literal; o parser determinístico resolve.",
+      "properties": {
+        "tipo": {
+          "enum": [
+            "tarefa",
+            "compromisso",
+            "ideia",
+            "compra",
+            "nota"
+          ],
+          "title": "Tipo",
+          "type": "string"
+        },
+        "titulo": {
+          "maxLength": 80,
+          "title": "Titulo",
+          "type": "string"
+        },
+        "contexto": {
+          "enum": [
+            "casa",
+            "trabalho",
+            "freelance",
+            "estudos",
+            "saude",
+            "financas",
+            "outro"
+          ],
+          "title": "Contexto",
+          "type": "string"
+        },
+        "prazo_texto": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prazo Texto"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5,
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tipo",
+        "titulo",
+        "contexto"
+      ],
+      "title": "ItemIA",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "itens": {
+      "items": {
+        "$ref": "#/$defs/ItemIA"
+      },
+      "minItems": 1,
+      "title": "Itens",
+      "type": "array"
+    }
+  },
+  "required": [
+    "itens"
+  ],
+  "title": "SaidaIA",
+  "type": "object"
+}

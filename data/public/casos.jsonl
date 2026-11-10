@@ -1,0 +1,46 @@
+{"texto": "pagar a conta de luz amanhã", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-11"}]}
+{"texto": "dentista sexta às 14h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "saude", "prazo_em": "2026-11-13T14:00"}]}
+{"texto": "comprar leite, pão e ovos", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compra", "contexto": "casa", "prazo_em": null}]}
+{"texto": "estudar fastapi depois de amanhã e revisar sql dia 15", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-12"}, {"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-15"}]}
+{"texto": "mandar proposta pro cliente do portal até segunda, urgente", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "freelance", "prazo_em": "2026-11-16"}]}
+{"texto": "ideia: app que organiza notas soltas com ia", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "ideia", "contexto": "outro", "prazo_em": null}]}
+{"texto": "reunião com o time hoje 16:30", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "trabalho", "prazo_em": "2026-11-10T16:30"}]}
+{"texto": "ligar pro mecânico daqui 3 dias", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "casa", "prazo_em": "2026-11-13"}]}
+{"texto": "renovar o domínio do site em 2 semanas", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "freelance", "prazo_em": "2026-11-24"}]}
+{"texto": "anotar: a senha do wifi novo está no roteador", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "nota", "contexto": "casa", "prazo_em": null}]}
+{"texto": "consulta com cardiologista quinta às 9h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "saude", "prazo_em": "2026-11-12T09:00"}]}
+{"texto": "fazer o exame de sangue amanhã cedo", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "saude", "prazo_em": "2026-11-11"}]}
+{"texto": "pagar boleto do cartão dia 20", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-20"}]}
+{"texto": "transferir o aluguel até sexta", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-13"}]}
+{"texto": "declarar imposto de renda do mei", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": null}]}
+{"texto": "comprar ração do cachorro e detergente", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compra", "contexto": "casa", "prazo_em": null}]}
+{"texto": "ver curso de docker hoje à noite", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-10"}]}
+{"texto": "reunião de alinhamento com o cliente amanhã 10h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "freelance", "prazo_em": "2026-11-11T10:00"}]}
+{"texto": "enviar relatório semanal para o gestor sexta", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "trabalho", "prazo_em": "2026-11-13"}]}
+{"texto": "ideia de projeto: bot telegram que resume emails", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "ideia", "contexto": "outro", "prazo_em": null}]}
+{"texto": "lembrar de ligar pra mãe domingo", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "casa", "prazo_em": "2026-11-15"}]}
+{"texto": "estudar kotlin coroutines na semana que vem", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-17"}]}
+{"texto": "trocar o óleo do carro dia 25", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "casa", "prazo_em": "2026-11-25"}]}
+{"texto": "nota: o cliente prefere reunião por meet", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "nota", "contexto": "freelance", "prazo_em": null}]}
+{"texto": "comprar cabo usb-c e pilhas", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compra", "contexto": "casa", "prazo_em": null}]}
+{"texto": "entregar o portal do cliente em 1 semana", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "freelance", "prazo_em": "2026-11-17"}]}
+{"texto": "prova de banco de dados quarta às 19h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "estudos", "prazo_em": "2026-11-11T19:00"}]}
+{"texto": "revisar o pull request do time hoje", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "trabalho", "prazo_em": "2026-11-10"}]}
+{"texto": "ideia: dashboard de gastos com sqlite", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "ideia", "contexto": "financas", "prazo_em": null}]}
+{"texto": "marcar veterinário pro gato sábado", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "casa", "prazo_em": "2026-11-14"}]}
+{"texto": "fazer backup do pc dia 30", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "casa", "prazo_em": "2026-11-30"}]}
+{"texto": "pagar a fatura do cartão amanhã e comprar presente pra irmã sábado", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-11"}, {"tipo": "compra", "contexto": "casa", "prazo_em": "2026-11-14"}]}
+{"texto": "reunião de planejamento terça às 15h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "trabalho", "prazo_em": "2026-11-17T15:00"}]}
+{"texto": "anotar: node precisa da versão 20 pro projeto", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "nota", "contexto": "trabalho", "prazo_em": null}]}
+{"texto": "comprar fone novo", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compra", "contexto": "casa", "prazo_em": null}]}
+{"texto": "pedir orçamento de hospedagem pro cliente depois de amanhã", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "freelance", "prazo_em": "2026-11-12"}]}
+{"texto": "treino de perna hoje 18h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "saude", "prazo_em": "2026-11-10T18:00"}]}
+{"texto": "ver o que cai na prova de redes quinta", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-12"}]}
+{"texto": "ideia: usar tailscale pra acessar o servidor de casa", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "ideia", "contexto": "outro", "prazo_em": null}]}
+{"texto": "pagar o dentista em 3 dias", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-13"}]}
+{"texto": "reunião com o contador dia 12 às 11h", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compromisso", "contexto": "financas", "prazo_em": "2026-11-12T11:00"}]}
+{"texto": "ligar pro banco pra resolver o cartão amanhã", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "financas", "prazo_em": "2026-11-11"}]}
+{"texto": "nota: a reunião mensal é sempre na primeira segunda", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "nota", "contexto": "trabalho", "prazo_em": null}]}
+{"texto": "comprar tinta e pincel pro quarto", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "compra", "contexto": "casa", "prazo_em": null}]}
+{"texto": "montar a escala de estudos até domingo", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "estudos", "prazo_em": "2026-11-15"}]}
+{"texto": "enviar nota fiscal pro cliente até quinta", "agora": "2026-11-10T09:00", "esperado": [{"tipo": "tarefa", "contexto": "freelance", "prazo_em": "2026-11-12"}]}

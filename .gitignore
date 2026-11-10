@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+# notas reais nunca vão pro repo
+data/private/*
+!data/private/.gitkeep
+*.db
+*.gguf
+*.keystore
+local.properties
+build/
+.gradle/
+.idea/

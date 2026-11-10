@@ -4,14 +4,14 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Tipo = Literal["tarefa", "compromisso", "ideia", "compra", "nota"]
-Contexto = Literal["casa", "trabalho", "freelance", "estudos", "saude", "financas", "outro"]
+Contexto = Literal["casa", "trabalho", "freelance", "estudos", "saude", "financas", "outro"]  # pastas padrão (o usuário cria/apaga outras)
 
 
 class ItemIA(BaseModel):
     """O que o modelo devolve. Data é só o trecho literal; o parser determinístico resolve."""
     tipo: Tipo
     titulo: str = Field(max_length=80)
-    contexto: Contexto
+    contexto: str = Field(max_length=40)  # slug de uma pasta; o enum vai no JSON Schema de cada chamada
     prazo_texto: str | None = None
     tags: list[str] = Field(default_factory=list, max_length=5)
 

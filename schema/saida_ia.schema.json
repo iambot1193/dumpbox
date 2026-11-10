@@ -20,15 +20,7 @@
           "type": "string"
         },
         "contexto": {
-          "enum": [
-            "casa",
-            "trabalho",
-            "freelance",
-            "estudos",
-            "saude",
-            "financas",
-            "outro"
-          ],
+          "maxLength": 40,
           "title": "Contexto",
           "type": "string"
         },

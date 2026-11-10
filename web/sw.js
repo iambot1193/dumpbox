@@ -1,5 +1,5 @@
 // Cache só do "casco" do app (cache-first). A API nunca é cacheada.
-const V = "dumpbox-v7", CASCO = ["/", "/app.js", "/manifest.webmanifest", "/icon.svg"];
+const V = "dumpbox-v12", CASCO = ["/", "/app.js", "/manifest.webmanifest", "/icon.svg", "/fonts/barlow-500.woff2", "/fonts/barlow-700.woff2"];
 self.addEventListener("install", e => e.waitUntil(caches.open(V).then(c => c.addAll(CASCO))));
 self.addEventListener("activate", e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k))))));
 self.addEventListener("fetch", e => {

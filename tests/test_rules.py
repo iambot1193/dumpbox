@@ -23,6 +23,11 @@ CASOS = {
     "3 dias": "2026-11-13",
     "daqui a três dias": "2026-11-13",
     "pagar boleto dia 20": "2026-11-20",  # 'boleto dia' não pode virar relativo
+    "sex": "2026-11-13",  # abreviação de WhatsApp
+    "até qua": "2026-11-11",
+    "sábado": "2026-11-14",
+    "sexta-feira": "2026-11-13",
+    "terça 10h": "2026-11-17T10:00",
     "um dia qualquer": None,
     None: None,
 }

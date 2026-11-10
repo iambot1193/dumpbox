@@ -3,7 +3,7 @@ import re
 import unicodedata
 from datetime import date, datetime, timedelta
 
-_DIAS = {"segunda": 0, "terca": 1, "quarta": 2, "quinta": 3, "sexta": 4, "sabado": 5, "domingo": 6}
+_DIAS3 = {"seg": 0, "ter": 1, "qua": 2, "qui": 3, "sex": 4, "sab": 5, "dom": 6}
 _NUM = {"um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "quatro": 4, "cinco": 5, "seis": 6,
         "sete": 7, "oito": 8, "nove": 9, "dez": 10, "quinze": 15}
 
@@ -53,8 +53,8 @@ def resolver_prazo(texto: str | None, agora: datetime) -> str | None:
             d = hoje.replace(day=dia) if dia >= hoje.day else (hoje.replace(day=1) + timedelta(days=32)).replace(day=dia)
         except ValueError:
             d = None
-    elif m := re.search(r"\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)\b", t):
-        delta = (_DIAS[m[1]] - hoje.weekday()) % 7 or 7  # sempre a próxima ocorrência
+    elif m := re.search(r"\b(seg|ter|qua|qui|sex|sab|dom)(?:unda|ca|rta|nta|ta|ado|ingo)?\b", t):  # "sex" = sexta
+        delta = (_DIAS3[m[1]] - hoje.weekday()) % 7 or 7  # sempre a próxima ocorrência
         d = hoje + timedelta(days=delta)
     elif "semana que vem" in t:
         d = hoje + timedelta(days=7)

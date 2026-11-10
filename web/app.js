@@ -11,7 +11,11 @@ async function api(url, body) {
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body) });
   if (r.status === 401) { mostra("login"); throw new Error("401"); }
-  if (!r.ok) throw new Error(r.status);
+  if (!r.ok) {
+    const e = new Error(r.status);
+    e.detail = (await r.json().catch(() => ({}))).detail;
+    throw e;
+  }
   return r.json();
 }
 function mostra(tela) { for (const t of ["setup", "login", "app"]) $(t).hidden = tela !== t; }
@@ -79,7 +83,15 @@ $("criar").onclick = async () => {
   const a = $("nsenha").value, b = $("nsenha2").value;
   if (a !== b) { $("serr").textContent = "As senhas não conferem."; return; }
   try { await api("/api/setup", { senha: a }); $("nsenha").value = $("nsenha2").value = ""; iniciar(); }
-  catch (e) { $("serr").textContent = String(e.message) === "403" ? "Crie a senha abrindo o app no próprio PC (http://127.0.0.1:8000)." : "Use pelo menos 8 caracteres."; }
+  catch (e) {
+    const s = String(e.message);
+    $("serr").textContent =
+      s === "403" ? "Crie a senha abrindo o app no próprio PC (http://127.0.0.1:8000), não por link externo." :
+      s === "409" ? "A senha já foi criada. Recarregue a página e entre." :
+      s === "422" ? "Use pelo menos 8 caracteres." :
+      /^\d+$/.test(s) ? `Erro ${s} no servidor${typeof e.detail === "string" ? ": " + e.detail : ""}.` :
+      "Não consegui falar com o servidor. O dumpbox está aberto? Confira o endereço da página.";
+  }
 };
 
 async function iniciar() {

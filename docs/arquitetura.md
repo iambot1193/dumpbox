@@ -30,11 +30,37 @@ O texto digitado pode misturar anotações novas e instruções sobre itens exis
 3. A ação só vale se o item for citado na linha (≥60% das palavras do título).
 4. Tudo é aplicado na hora e é reversível: "excluir" arquiva, e o diário `alteracao` alimenta o botão Desfazer. Duplicados são achados por regra (título normalizado, fica o mais novo).
 5. Linhas sem instrução vão para o classificador. Instrução sem ação válida vai para Revisar, com "Tentar de novo" e "Guardar como anotação".
+6. **Pedido em massa** ("separar melhor tudo que está em trabalho", verbo de organizar + "tudo/pasta/itens"): o modelo revisa a pasta de cada item do escopo (`em trabalho` = só essa pasta; sem pasta = todos os abertos). Só itens do escopo mudam, e tudo entra no diário.
+7. **Aprende com você:** itens que mudaram de pasta e continuam lá (arraste, Mover, instrução, IA) viram exemplos no prompt do classificador e da reorganização (`db.exemplos`). Mover de novo corrige o exemplo; Desfazer o remove.
+8. **Colagem do WhatsApp:** o cabeçalho `[hh:mm, dd/mm/aaaa] Nome:` sai do texto, e "amanhã"/"sex" contam a partir da data de cada mensagem. Dias abreviados (seg…dom) viram data.
+9. **Sem repetidos:** item novo com o mesmo título (normalizado) de um item aberto não é criado.
 
 Limite: lista em várias linhas com o destino só na última tem as primeiras linhas tratadas como anotações novas.
 
-### Chat (aba "Chat")
-Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). O modelo **só propõe**: cada ação (criar, estado, prazo, contexto, prioridade) é validada pelo servidor (item existe, enum válido, data resolvida por regra) e só é aplicada após **Confirmar** na tela; propostas expiram em 15 min e valem uma vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
+### Tela (opção B2 dos mockups em `docs/mockups/`)
+- **Lateral de pastas** (no celular vira trilho): Hoje, as pastas (= `contexto`), Revisar e Lixeira. As pastas são alvo de arraste.
+- **Pastas do usuário** (tabela `pasta`, semeada com as 7 padrão): "+ Nova pasta" cria com nome e descrição; a descrição vai para o prompt e o slug entra no enum do JSON Schema de cada chamada, então a IA passa a usar a pasta nova na hora. "Apagar pasta" pede o destino dos itens (outra pasta ou Lixeira) e nunca apaga item junto. Outro não pode ser apagada; nomes de tela (Hoje, Revisar, Lixeira) são recusados.
+- **Hoje:** atrasados e prazos do dia de todas as pastas.
+- **Pasta = grade livre de 4 colunas:** o card pode ir para qualquer célula (pode deixar buracos) e crescer pelo canto até 4x4. Nada se sobrepõe: quem estava no lugar desce. A posição e o tamanho ficam em `item.grade_*` (`POST /api/layout`). Mudar de pasta zera a posição. No celular a grade vira lista nessa ordem.
+- **Arrastar:** com o mouse, na hora; no toque, depois de segurar 300 ms (mexer antes disso é rolagem). "Mover para…" no card faz o mesmo sem arraste.
+- **Criticidade:** crítica, alta, média e baixa. A regra sugere de alta a baixa pelo prazo; só o usuário marca crítica, e a escolha manual não é recalculada.
+- **Feito, Excluir, Restaurar, Mover e criticidade** passam por `POST /api/itens/{id}/editar`, o mesmo validador das ações da IA, com diário e aviso com Desfazer.
+- **Seleção múltipla:** clique marca um card (como no Explorer), Ctrl+clique soma ou tira, Shift+clique marca o intervalo (na ordem da tela), segurar no espaço vazio e arrastar desenha um laço que marca os cards tocados (com Ctrl/Shift, soma), Ctrl+A marca todos, Esc limpa e Delete manda para a Lixeira. No celular, o botão "Selecionar" faz o toque marcar. A barra aplica Feito, Mover, Criticidade ou Excluir em todos (`POST /api/itens/editar` com `ids`: tudo ou nada, um Desfazer). Arrastar um card marcado leva a seleção inteira para a pasta.
+- **+ Nova:** tarefa criada à mão, sem IA (`POST /api/itens`). Prazo em texto livre ("sexta 14h") pelas mesmas regras; criticidade automática pelo prazo ou escolhida.
+- **Lixeira:** Excluir arquiva. "Apagar de vez" e "Esvaziar" pedem confirmação, removem o item e o diário dele e reescrevem a nota original sem o texto apagado (ou apagam a nota, se era o último item).
+
+### Janela flutuante da IA
+Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). As ações (criar, estado, prazo, contexto, prioridade) são validadas pelo servidor (item existe, enum válido, data resolvida por regra), precisam citar o item no pedido ou no turno anterior e são **aplicadas na hora com Desfazer**. Não existe ação de apagar de vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
+
+### Modelo de dados atual (servidor, `db.py`)
+- `captura(id UUID do cliente, texto, origem[web|chat|editor|manual], criado_em, status[pendente|ok|falhou], erro)`: texto original; só muda em "Apagar de vez".
+- `item(id, captura_id, tipo, titulo, contexto = slug da pasta, prazo_texto, prazo_em, prioridade[critica|alta|media|baixa], tags, estado[catalogado|feito|arquivado], criado_em, grade_col, grade_lin, grade_larg, grade_alt)`.
+- `pasta(slug, nome, descricao, ordem, criado_em)`: semeada com as 7 padrão; `outro` é fixa.
+- `alteracao(grupo, captura_id, item_id, campo, antes, depois, descricao, desfeito)`: diário de toda mudança da tela, do editor e da IA; um grupo = um Desfazer. Também é a fonte dos exemplos que a IA aprende (`db.exemplos`).
+- `classificacao(captura_id, modelo, prompt_v, latencia_ms, valido, erro)`: auditoria de cada chamada.
+
+### Testes
+- `tests/test_rules.py` (datas), `tests/test_api.py` (API, editor, IA com Ollama falso, pastas, lixeira), `tests/ui_browser.py` (tela real no Chrome headless, PC e celular com toque, banco temporário).
 
 ## Decisões (histórico, parte Android)
 - **Android nativo (Kotlin), Android-only.** StatCounter jun-ago/2026: ~68% mundo, ~75-79% Brasil.

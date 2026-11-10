@@ -1,0 +1,214 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>dumpbox opção B2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#12140f;--panel:#1b1e17;--raise:#23271e;--line:#3b4133;--txt:#f0ecdd;--mute:#b1b29d;--sig:#ff7a2f;--ok:#a7d46a;--late:#ff4d6d;--ink:#14160f}
+html,body{width:1800px;height:1050px;overflow:hidden}
+body{background:#080907;color:var(--txt);font-family:Bahnschrift,"Segoe UI",sans-serif}
+.stage{position:relative;width:1800px;height:1050px}
+.desk{position:absolute;left:24px;top:24px;width:1320px;height:1002px;overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+.side{position:absolute;left:1378px;top:24px;width:390px;height:1002px}
+.phone{position:absolute;left:0;bottom:0;width:390px;height:900px;border-radius:42px;padding:9px;background:#2b2f25}
+.screen{position:relative;width:372px;height:882px;border-radius:34px;overflow:hidden;background:var(--bg)}
+.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.cursor{position:absolute;width:26px;height:26px;fill:#fff;stroke:#111;stroke-width:1.6;stroke-linejoin:round;z-index:9}
+.bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;font:12px Consolas,monospace;border-bottom:1px solid var(--line);color:var(--mute)}
+.bar b{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.35}.bar span{margin-left:12px}
+.status{height:34px;display:flex;align-items:center;justify-content:space-between;padding:6px 26px 0;font:600 13px "Segoe UI",sans-serif}
+.status i{display:block;width:22px;height:11px;border:1.5px solid currentColor;border-radius:3px;position:relative}
+.status i:after{content:"";position:absolute;inset:1.5px 5px 1.5px 1.5px;background:currentColor;border-radius:1px}
+button{font:inherit;color:inherit;background:none;border:0;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+
+/* lateral */
+.nav{position:absolute;left:0;top:30px;bottom:0;width:248px;background:var(--panel);border-right:1px solid var(--line)}
+.logo{font:700 24px Consolas,monospace;padding:16px 18px 12px}.logo u{text-decoration:none;color:var(--sig)}
+.lb{font:12.5px Consolas,monospace;color:var(--mute);padding:12px 18px 6px;display:flex;justify-content:space-between}
+.fold{position:relative;display:flex;align-items:center;justify-content:space-between;height:46px;padding:0 18px;font-size:17px;border-top:1px solid var(--line)}
+.fold>span{font:700 20px Consolas,monospace}
+.fold .ic{display:flex;align-items:center;gap:8px}
+.fold.on{background:var(--raise);box-shadow:inset 4px 0 0 var(--txt);font-weight:700}
+.fold.over{background:var(--txt);color:var(--ink);width:292px;z-index:3;height:68px;font-weight:700;font-size:21px;border:0}
+.fold.over small{font:700 13px Consolas,monospace;display:block}.fold.over em{font:700 16px Consolas,monospace;margin-left:8px}
+.chip{font:700 12px Consolas,monospace;background:var(--late);color:var(--ink);padding:2px 6px;display:inline-flex;gap:4px;align-items:center}
+.fim{position:absolute;left:0;right:0;bottom:0}
+
+/* captura */
+.main{position:absolute;left:248px;right:0;top:30px;bottom:0;padding:18px 28px}
+.cin{display:flex;background:var(--panel);border:1px solid var(--line);font:15.5px/1.4 Consolas,monospace}
+.cin .tx{flex:1;padding:10px 14px;min-height:70px}.cin .tx b{color:var(--sig);margin-right:9px}
+.cin .tx u{display:inline-block;width:8px;height:17px;background:var(--txt);vertical-align:-3px;text-decoration:none}
+.save{background:var(--sig);color:#14110b;font:700 16px Bahnschrift,sans-serif;padding:0 24px;flex-direction:column;justify-content:center;gap:1px}
+.save small{font:12px Consolas,monospace}
+.fila{display:flex;align-items:center;gap:7px;font:13px Consolas,monospace;color:var(--mute);margin-top:8px;height:18px}
+.fila .i{color:var(--txt)}
+.hd{display:flex;align-items:baseline;gap:14px;margin:16px 0 14px}
+.hd h2{font-size:44px;font-weight:700;letter-spacing:-.8px;line-height:1}.hd>span{font:15px Consolas,monospace;color:var(--mute)}
+.hd .tg{margin-left:auto;font:13.5px Consolas,monospace;color:var(--mute);display:flex;align-items:center;gap:7px}
+.hd .tg i{display:block;width:14px;height:14px;border:1.5px solid var(--mute)}
+.sec{font:13px Consolas,monospace;color:var(--mute);margin:16px 0 8px;letter-spacing:.5px}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(4,245px);gap:12px;grid-auto-flow:dense}
+.c{position:relative;background:var(--panel);border:1px solid var(--line);padding:12px 13px;display:flex;flex-direction:column}
+.c.alta{grid-column:span 2;background:var(--raise);border-left:4px solid var(--sig)}
+.c.hov{border-color:var(--txt)}
+.meta{display:flex;justify-content:space-between;align-items:center;font:12.5px Consolas,monospace;color:var(--mute);min-height:26px}
+.k{display:flex;align-items:center;gap:5px}.k em{font-style:normal;color:var(--txt);border:1px solid var(--line);padding:0 6px;margin-left:4px}
+.sig{display:flex;align-items:center;gap:6px}.sig i{display:flex;gap:2px;align-items:flex-end}.sig u{display:block;width:4px;background:var(--line)}
+.sig u:nth-child(1){height:6px}.sig u:nth-child(2){height:10px}.sig u:nth-child(3){height:14px}
+.sig .on{background:var(--txt)}.alta .sig .on{background:var(--sig)}.alta .sig{color:var(--sig);font-weight:700}
+.c h3{font-size:21px;line-height:1.14;font-weight:600;margin:6px 0 7px}.c.alta h3{font-size:30px;font-weight:700;letter-spacing:-.3px;margin:4px 0 6px}
+.due{display:flex;align-items:center;gap:6px;font:13.5px Consolas,monospace}
+.btns{display:flex;gap:2px}.btns button{width:30px;height:26px;justify-content:center;border:1px solid var(--line);color:var(--mute);font-size:15px}
+.btns button.lit{color:var(--txt);border-color:var(--txt)}
+.menu{position:absolute;right:10px;top:42px;width:176px;background:var(--txt);color:var(--ink);z-index:6;font:14.5px Bahnschrift,sans-serif;padding:4px 0}
+.menu h6{font:12px Consolas,monospace;padding:4px 12px 6px;color:#55574a}
+.menu div{padding:6px 12px;display:flex;justify-content:space-between}.menu .cur{color:#7c7d6e}
+.ghost{border:1px dashed var(--mute);display:flex;align-items:center;justify-content:center;font:13px Consolas,monospace;color:var(--mute);min-height:96px}
+.drag{position:absolute;width:245px;background:#2b3024;outline:2px solid var(--txt);transform:rotate(-2.5deg);z-index:8;box-shadow:0 18px 0 -6px #000;padding:10px 13px 13px}
+
+/* toast + IA */
+.toast{position:absolute;left:276px;bottom:18px;display:flex;align-items:center;gap:14px;background:var(--raise);border:1px solid var(--txt);padding:10px 14px;font:14px Consolas,monospace;z-index:5}
+.toast button{font-weight:700;text-decoration:underline}.toast .i{color:var(--ok)}
+.ai{position:absolute;z-index:7;background:var(--txt);color:var(--ink);font:14px/1.3 Consolas,monospace;border-radius:2px}
+.ai-h{display:flex;align-items:center;gap:7px;background:var(--ink);color:var(--txt);border:1px solid var(--txt);padding:7px 12px;font:600 15.5px Bahnschrift,sans-serif}
+.ai-h .i:last-child{margin-left:auto}
+.msg{margin:11px 12px 9px;padding-left:9px;border-left:3px solid var(--ink);font:600 15.5px/1.22 Bahnschrift,sans-serif}
+.res{padding:0 12px;display:flex;flex-direction:column;gap:6px}.res p{display:flex;gap:6px}.res p .i{margin-top:3px;color:#3f6b12}
+.undo{margin:11px 12px;background:var(--ink);color:var(--txt);padding:6px 12px;font:700 13.5px Consolas,monospace}
+.ai-in{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid #b9b5a2;color:#55574a}
+.fab{position:absolute;z-index:7;width:54px;height:54px;background:var(--txt);color:var(--ink);justify-content:center;font-size:26px}
+
+/* legenda */
+.cap small{font:700 13px Consolas,monospace;color:var(--sig)}.cap h1{font-size:30px;font-weight:700;letter-spacing:-.4px}.cap p{font-size:14.5px;line-height:1.27;color:var(--mute);margin-top:2px}
+
+/* celular */
+.rail{position:absolute;left:0;top:34px;bottom:0;width:68px;background:var(--panel);border-right:1px solid var(--line)}
+.rail .logo{font-size:19px;padding:9px 0 8px;text-align:center}
+.r-f{height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-top:1px solid var(--line);font:11.5px Consolas,monospace;color:var(--mute);gap:1px}
+.r-f b{font-size:20px;color:var(--txt)}
+.r-f.on{background:var(--raise);box-shadow:inset 3px 0 0 var(--txt);color:var(--txt)}
+.r-f.over{background:var(--txt);color:var(--ink);width:176px;position:relative;z-index:3;flex-direction:row;justify-content:flex-start;padding-left:9px;gap:8px;font:700 19px Bahnschrift,sans-serif;height:64px}
+.r-f.over b{color:var(--ink)}.r-f.over small{font:700 12px Consolas,monospace}
+.r-b{position:absolute;bottom:0;left:0;right:0;padding-bottom:8px}
+.m{position:absolute;left:68px;right:0;top:34px;bottom:0;padding:4px 10px}
+.m .cin{font-size:13.5px}.m .cin .tx{padding:7px 9px;min-height:56px}.m .save{font-size:14px;padding:0 11px}
+.m .fila{font-size:12px;margin-top:5px}
+.m .hd{margin:9px 0 7px;gap:8px}.m .hd h2{font-size:30px}.m .hd>span{font-size:13px}
+.m .hd .tg{font-size:12px}
+.m .c{margin-bottom:8px;padding:8px 10px 4px}.m .c h3{font-size:18px;margin:2px 0 4px}.m .c.alta h3{font-size:22px;margin:2px 0 3px}
+.m .ghost{min-height:56px;margin-bottom:8px}
+.big{display:flex;justify-content:space-between;margin-top:2px}.big button{width:44px;height:44px;justify-content:center;font-size:20px}
+.big .ok{color:var(--ok)}.big div{display:flex}.big .mv{color:var(--txt)}.big .tr{color:var(--mute)}
+.m-drag{position:absolute;left:112px;top:296px;width:206px;background:#2b3024;outline:2px solid var(--txt);padding:7px 9px;transform:rotate(-2.5deg);z-index:6}
+.m-drag h3{font-size:16.5px;font-weight:600;margin-top:3px}
+.ai-mini{position:absolute;left:78px;right:66px;bottom:10px;height:52px;z-index:7;background:var(--txt);color:var(--ink);display:flex;align-items:center;gap:8px;padding:0 10px;font:13px Consolas,monospace}
+.ai-mini .i{color:#3f6b12}.ai-mini button{margin-left:auto;font-weight:700;text-decoration:underline}
+
+/* lixeira */
+.lx button{height:44px;padding:0 10px;font:13.5px Consolas,monospace}
+.lx .acoes{display:flex;justify-content:space-between}.lx .rst{color:var(--txt)}.lx .del{color:var(--late)}
+.esv{margin-left:auto;font:13px Consolas,monospace;color:var(--late);text-decoration:underline}
+.veu{position:absolute;inset:0;background:rgba(5,6,4,.72);z-index:10}
+.dlg{position:absolute;left:18px;right:18px;top:300px;background:var(--txt);color:var(--ink);z-index:11;padding:18px 16px 12px}
+.dlg h4{font-size:23px;font-weight:700}.dlg p{font-size:15px;line-height:1.3;margin:7px 0 14px}
+.dlg div{display:flex;justify-content:flex-end;gap:8px}.dlg button{height:44px;padding:0 14px;font:700 14px Consolas,monospace}
+.dlg .no{border:1px solid var(--ink)}.dlg .si{background:#c8102e;color:#fff}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="undo" viewBox="0 0 24 24"><path d="M8 4L4 8l4 4M4 8h10a6 6 0 0 1 0 12h-4"/></symbol>
+<symbol id="retry" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.2 6.5M20 4.5V11h-6.5"/></symbol>
+<symbol id="task" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="2"/><path d="M4 10.5h16M8 3v4M16 3v4"/></symbol>
+<symbol id="idea" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+<symbol id="cart" viewBox="0 0 24 24"><path d="M3 4h2.5l2.3 11h10.4l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H11l-4.5 4v-4H4z"/><path d="M8.5 10.5h7"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+<symbol id="alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></symbol>
+<symbol id="move" viewBox="0 0 24 24"><path d="M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4"/></symbol>
+<symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></symbol>
+<symbol id="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
+</defs></svg>
+<div id="palco"></div>
+<script>
+const ic = n => `<svg class="i"><use href="#${n}"/></svg>`;
+const cur = s => `<svg class="cursor" style="${s}" viewBox="0 0 24 24"><path d="M5 2l15 11-6.5 1.2 3.7 6.8-3.2 1.7-3.6-6.9L5 20.5z"/></svg>`;
+const NIVEL = {alta: 3, média: 2, baixa: 1};
+const sinal = p => `<span class="sig">${p}<i>${[1, 2, 3].map(n => `<u class="${n <= NIVEL[p] ? "on" : ""}"></u>`).join("")}</i></span>`;
+const PASTAS = [["Casa", 5], ["Trabalho", 7], ["Freelance", 3], ["Estudos", 3], ["Saúde", 3], ["Finanças", 3], ["Outro", 2]];
+
+function card(c, phone) {
+  const prazo = c.late ? `<div class="due"><span class="chip">${ic("alert")}${c.late}</span></div>` : c.due ? `<div class="due">${ic("clock")}${c.due}</div>` : "";
+  const dir = c.hov ? `<span class="btns"><button class="${c.menu ? "" : "lit"}">${ic("check")}</button><button class="${c.menu ? "lit" : ""}">${ic("move")}</button><button>${ic("trash")}</button></span>` : sinal(c.p);
+  const pe = phone ? `<div class="big"><button class="ok">${ic("check")}</button><div><button class="mv">${ic("move")}</button><button class="tr">${ic("trash")}</button></div></div>` : "";
+  const menu = c.menu ? `<div class="menu"><h6>Mover para…</h6>${PASTAS.map(([n]) => `<div class="${n === c.menu ? "cur" : ""}">${n}${n === c.menu ? "<span>atual</span>" : ""}</div>`).join("")}</div>` : "";
+  return `<article class="c ${c.p === "alta" ? "alta" : ""} ${c.hov ? "hov" : ""}"><div class="meta"><span class="k">${ic(c.i)}${c.k}${c.pasta ? `<em>${c.pasta}</em>` : ""}</span>${dir}</div><h3>${c.t}</h3>${prazo}${pe}${menu}</article>`;
+}
+
+function nav(ativo, sobre) {
+  const f = (n, q, cls = "") => `<div class="fold ${cls}">${n}<span>${q}</span></div>`;
+  return `<nav class="nav"><div class="logo">dump<u>box</u>_</div>
+  <div class="fold ${ativo === "Hoje" ? "on" : ""}"><span class="ic" style="font:inherit">${ic("sun")}Hoje <span class="chip">1 atrasado</span></span><span>4</span></div>
+  <div class="lb"><span>PASTAS</span><span>abertos</span></div>
+  ${PASTAS.map(([n, q]) => n === sobre ? `<div class="fold over"><div>${n}<em>${q}→${q + 1}</em><small>solte para mover</small></div></div>` : f(n, q, n === ativo ? "on" : "")).join("")}
+  <div class="fim">${f(`<span class="ic">${ic("alert")}Revisar</span>`, 2)}${f(`<span class="ic">${ic("trash")}Lixeira</span>`, 3)}</div></nav>`;
+}
+function rail(ativo, sobre) {
+  const f = (n, q, cls = "") => `<div class="r-f ${cls}"><b>${q}</b>${n}</div>`;
+  return `<div class="rail"><div class="logo">d<u>b</u>_</div>${f("Hoje", 4, ativo === "Hoje" ? "on" : "")}
+  ${PASTAS.map(([n, q]) => n === sobre ? `<div class="r-f over"><b>${q}</b><div>${n}<br><small>solte aqui</small></div></div>` : f(n, q, n === ativo ? "on" : "")).join("")}
+  <div class="r-b">${f("Revisar", 2)}${f("Lixeira", 3, ativo === "Lixeira" ? "on" : "")}</div></div>`;
+}
+const captura = (a, b, hint) => `<div class="cin"><div class="tx"><b>&gt;</b>${a}${b ? "<br>" + b : ""}<u></u></div><button class="save">Guardar${hint ? "<small>Ctrl+Enter</small>" : ""}</button></div>`;
+const fila = t => `<div class="fila">${ic("spin")}${t}</div>`;
+const moldura = (nome, h) => `<div class="stage">${h}</div>`;
+const FAKE_BAR = `<div class="bar"><b></b><b></b><b></b><span>127.0.0.1:8000</span></div>`;
+const telefone = h => `<div class="phone"><div class="screen"><div class="status"><span>9:41</span><i></i></div>${h}</div></div>`;
+
+const NF = {t: "Enviar nota fiscal de outubro", k: "tarefa", i: "task", p: "alta", late: "atrasado 2 dias"};
+const RP = {t: "Revisar proposta do cliente", k: "tarefa", i: "task", p: "alta", due: "hoje, 17h"};
+const RE = {t: "Reunião de alinhamento", k: "compromisso", i: "cal", p: "média", due: "quinta, 10h"};
+const PL = {t: "Atualizar planilha de horas", k: "tarefa", i: "task", p: "baixa", due: "sexta"};
+const MO = {t: "Modelo de proposta reutilizável", k: "ideia", i: "idea", p: "baixa"};
+const SU = {t: "Comprar suporte de notebook", k: "compra", i: "cart", p: "baixa"};
+const EX = {t: "Agendar exame periódico", k: "compromisso", i: "cal", p: "média", due: "segunda, 8h"};
+const ghost = `<div class="ghost">card saiu daqui</div>`;
+
+const AI_RES = `<div class="msg">move o dentista pra Saúde e exclui os repetidos</div>
+<div class="res"><p>${ic("check")}<span><b>Dentista sexta 14h</b> foi para Saúde</span></p><p>${ic("check")}<span><b>2 repetidos</b> de Comprar café e pão foram para a Lixeira</span></p></div><button class="undo">${ic("undo")}Desfazer</button>`;
+
+const tela1 = moldura("1", `
+<section class="desk">${FAKE_BAR}${nav("Trabalho", "Saúde")}
+<main class="main">${captura("pagar luz amanhã", "dentista sexta 14h", true)}${fila("processando 3 notas")}
+<div class="hd"><h2>Trabalho</h2><span>7 abertos · 2 alta</span><div class="tg"><i></i>Mostrar feitos (1)</div></div>
+<div class="grid">${card(NF)}${card({...RE, hov: true})}${ghost}${card(RP)}${card(PL)}${card(MO)}${card(SU)}</div></main>
+<div class="c drag" style="left:300px;top:334px"><div class="meta"><span class="k">${ic("cal")}compromisso</span>${sinal("média")}</div><h3>${EX.t}</h3><div class="due">${ic("clock")}${EX.due}</div>${cur("left:-16px;top:42px")}</div>
+<div class="toast">${ic("check")}<span>“Comprar café” foi para Casa</span><button>${ic("undo")}Desfazer</button></div>
+<div class="ai" style="right:18px;bottom:82px;width:344px"><div class="ai-h">${ic("chat")}Assistente${ic("x")}</div>${AI_RES}<div class="ai-in"><span>Pede alguma coisa…</span>${ic("send")}</div></div>
+<button class="fab" style="right:18px;bottom:18px">${ic("x")}</button></section>
+<aside class="side"><div class="cap"><small>OPÇÃO B2 · B CORRIGIDA</small><h1>Console noturno</h1>
+<p>Laranja só em alta e Guardar. Ações do card surgem ao passar o mouse; no celular, ícones grandes.</p></div>
+${telefone(`${rail("Trabalho", "Saúde")}<div class="m">${captura("pagar luz", "dentista sexta", false)}${fila("1 na fila, aguardando o PC")}
+<div class="hd"><h2>Trabalho</h2><span>7 abertos</span></div>${card(NF, true)}${ghost}${card(RP, true)}${card(RE, true)}</div>
+<div class="m-drag"><div class="meta"><span class="k">${ic("cal")}compromisso</span></div><h3>${EX.t}</h3>${cur("left:-14px;bottom:-14px")}</div>
+<div class="ai-mini">${ic("check")}<span>2 feitas</span><button>Desfazer</button></div><button class="fab" style="right:8px;bottom:10px;width:52px;height:52px">${ic("chat")}</button>`)}
+</aside>`);
+
+const lixo = (t, de) => `<article class="c lx"><div class="meta"><span class="k">${ic("trash")}de ${de} · excluído hoje</span></div><h3>${t}</h3><div class="acoes"><button class="rst">${ic("undo")}Restaurar</button><button class="del">${ic("trash")}Apagar de vez</button></div></article>`;
+const tela2 = moldura("2", `
+<section class="desk">${FAKE_BAR}${nav("Hoje")}
+<main class="main">${captura("despeja aqui…", "", true)}<div class="fila"></div>
+<div class="hd"><h2>Hoje</h2><span>4 abertos em 3 pastas · terça, 10/11</span><div class="tg"><i></i>Mostrar feitos (2)</div></div>
+<div class="sec">ATRASADOS · 1</div><div class="grid">${card({...NF, pasta: "Trabalho"})}</div>
+<div class="sec">HOJE · 3</div><div class="grid">${card({...RP, pasta: "Trabalho"})}${card({t: "Consulta de retorno", k: "compromisso", i: "cal", p: "alta", due: "hoje, 14h", pasta: "Saúde"})}${card({t: "Pagar conta de luz", k: "tarefa", i: "task", p: "alta", due: "hoje", pasta: "Finanças", hov: true, menu: "Finanças"})}</div></main>
+<button class="fab" style="right:18px;bottom:18px">${ic("chat")}</button></section>
+<aside class="side"><div class="cap"><small>OPÇÃO B2 · TELAS NOVAS</small><h1>Hoje e Lixeira</h1>
+<p>Hoje junta prazos de todas as pastas. Lixeira restaura; apagar de vez pede confirmação.</p></div>
+${telefone(`${rail("Lixeira")}<div class="m"><div class="hd" style="margin-top:6px"><h2>Lixeira</h2><span>3 itens</span><button class="esv">Esvaziar</button></div>${lixo("Comprar café e pão", "Casa")}${lixo("Comprar café e pão", "Casa")}${lixo("Ligar p/ seguradora", "Finanças")}</div>
+<div class="veu"></div><div class="dlg"><h4>Apagar de vez?</h4><p>“Ligar p/ seguradora” some para sempre. Isso não tem Desfazer.</p><div><button class="no">Cancelar</button><button class="si">Apagar de vez</button></div></div>`)}
+</aside>`);
+document.getElementById("palco").innerHTML = location.hash === "#2" ? tela2 : tela1;
+</script></body></html>

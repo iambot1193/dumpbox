@@ -1,0 +1,110 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>dumpbox opção E</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1800px;height:1050px;overflow:hidden}
+.stage{position:relative;width:1800px;height:1050px}
+.desk{position:absolute;left:24px;top:24px;width:1320px;height:1002px;overflow:hidden}
+.side{position:absolute;left:1378px;top:24px;width:390px;height:1002px}
+.phone{position:absolute;left:0;bottom:0;width:390px;height:900px;border-radius:42px;padding:9px}
+.screen{position:relative;width:372px;height:882px;border-radius:34px;overflow:hidden}
+.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.cursor{position:absolute;width:26px;height:26px;fill:#fff;stroke:#111;stroke-width:1.6;stroke-linejoin:round;z-index:9}
+.bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;font:12px Consolas,monospace}
+.bar b{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.35}
+.bar span{margin-left:12px}
+.status{height:34px;display:flex;align-items:center;justify-content:space-between;padding:6px 26px 0;font:600 13px "Segoe UI",sans-serif}
+.status i{display:block;width:22px;height:11px;border:1.5px solid currentColor;border-radius:3px;position:relative}
+.status i:after{content:"";position:absolute;inset:1.5px 5px 1.5px 1.5px;background:currentColor;border-radius:1px}
+button{font:inherit;color:inherit;background:none;border:0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+
+:root{--g:#123f2f;--sage:#e9efdd;--cream:#fdfcf4;--pe:#ffb59a;--co:#b83d1a;--mute:#4a5c52;--line:#c3cfb6;--s:"Sitka Text",Georgia,serif;--h:"Sitka Display",Georgia,serif;--u:"Segoe UI",sans-serif}
+body{background:#cdd6c1;color:var(--g);font-family:var(--u)}
+.desk{background:var(--sage);border-radius:20px}
+.bar{background:var(--g);color:#c9d8c9}
+.nav{position:absolute;left:0;top:30px;bottom:0;width:252px;background:var(--g);color:var(--cream)}
+.logo{font:italic 700 33px var(--h);padding:12px 20px 12px}
+.lb{font:13px var(--u);color:#bcd0c0;padding:0 20px 5px}
+.f{position:relative;display:flex;align-items:center;justify-content:space-between;height:46px;margin:0 0 2px 12px;padding:0 20px 0 14px;font:18px var(--s);border-radius:23px 0 0 23px}
+.f b{font:600 19px var(--u)}
+.f.on{background:var(--sage);color:var(--g);font-weight:700}
+.f.over{background:var(--pe);color:#2a1408;width:368px;height:62px;border-radius:31px;z-index:3;font-weight:700;font-size:21px;justify-content:flex-start;gap:9px}
+.f.over small{display:block;font:600 13px var(--u)}
+.bin{position:absolute;left:0;right:0;bottom:0;padding:11px 20px 15px;border-top:1px solid #356353;font:13px var(--u)}
+.bin h5{display:flex;align-items:center;gap:7px;font:700 18px var(--s);margin-bottom:5px}.bin h5 b{margin-left:auto;font:600 19px var(--u)}
+.t{display:flex;justify-content:space-between;align-items:center;height:29px;border-top:1px solid #2d5546;color:#dbe6d8}.t .del{color:#ffc4ae;font-weight:700;text-decoration:underline}
+.main{position:absolute;left:252px;right:0;top:30px;bottom:0;padding:16px 28px}
+.cin{display:flex;align-items:center;height:50px;background:var(--cream);border-radius:25px;padding:0 5px 0 22px;font:17px var(--s)}
+.cin em{flex:1;font-style:normal}
+.save{height:40px;padding:0 26px;background:var(--g);color:var(--cream);border-radius:20px;font:700 16px var(--u)}
+.hd{display:flex;align-items:baseline;gap:12px;margin:12px 0 6px}.hd h2{font:700 52px/1.1 var(--h)}.hd span{font:15px var(--u);color:var(--mute)}
+.note{display:flex;align-items:center;gap:16px;font:13.5px var(--u);color:var(--mute);height:32px;margin-bottom:9px;white-space:nowrap}
+.note b{font:700 15px var(--s);color:var(--g)}
+.note button{color:var(--g);font-weight:600;text-decoration:underline}
+.cols{display:grid;grid-template-columns:repeat(3,329px);gap:12px;align-items:start}
+.cl{display:flex;flex-direction:column;gap:12px}
+.c{position:relative;background:var(--cream);border-radius:18px;padding:13px 15px 12px}
+.meta{display:flex;justify-content:space-between;align-items:center;font:13px var(--u);color:var(--mute)}
+.k{display:flex;align-items:center;gap:5px}
+.dots{display:flex;align-items:center;gap:6px;font-weight:600}.dots i{display:flex;gap:3px}.dots u{display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}.dots .on{background:var(--g)}
+h3{font:700 23px/1.13 var(--s);margin:8px 0 6px}
+.due{display:flex;align-items:center;gap:6px;font:600 14px var(--u)}
+.act{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.act button{height:32px;font:600 13.5px var(--u)}
+.act button:first-child{background:var(--g);color:var(--cream);border-radius:16px;padding:0 15px}
+.act button:last-child{color:var(--co)}
+.c.alta{background:var(--g);color:var(--cream);padding:17px 18px 15px}
+.c.alta h3{font:700 34px/1.08 var(--h)}
+.c.alta .meta{color:#c8dac9}.c.alta .dots .on{background:var(--pe)}.c.alta .dots u{background:#3b6a58}.c.alta .dots{color:var(--pe)}
+.c.alta .act{margin-top:20px}.c.alta .act button:first-child{background:var(--cream);color:var(--g)}.c.alta .act button:last-child{color:#ffc4ae}
+.c.baixa{background:transparent;box-shadow:inset 0 0 0 1.4px var(--line)}.c.baixa h3{font-size:20px;font-weight:400}
+.c.done{background:#dbe4cc}.c.done h3{font-size:19px;font-weight:400;text-decoration:line-through;color:var(--mute)}.c.done .act button:first-child{background:none;color:var(--g);padding:0;}
+.ghost{height:150px;border:2px dashed #7f9682;border-radius:18px;display:flex;align-items:center;justify-content:center;font:14px var(--u);color:var(--mute)}
+.drag{position:absolute;width:300px;transform:rotate(-2.5deg);z-index:8;box-shadow:0 0 0 2.5px var(--pe),10px 12px 0 rgba(18,63,47,.32)}
+.ai{position:absolute;background:var(--cream);z-index:7;border-radius:18px;box-shadow:0 0 0 2px var(--g),8px 9px 0 rgba(18,63,47,.28);font:14px/1.3 var(--u);overflow:visible}
+.ai-h{display:flex;align-items:center;gap:7px;padding:8px 14px;background:var(--g);color:var(--cream);font:700 16px var(--s);border-radius:18px 18px 0 0}.ai-h .x{margin-left:auto}
+.msg{margin:11px 14px 8px;font:italic 700 17px/1.2 var(--s)}
+.res{padding:0 14px;display:flex;flex-direction:column;gap:5px}.res p{display:flex;gap:6px}.res .i{margin-top:3px}
+.undo{margin:10px 14px;background:var(--pe);color:#2a1408;border-radius:15px;padding:4px 14px;font:700 13.5px var(--u)}
+.ai-in{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:7px 14px;color:var(--mute)}
+.fab{position:absolute;z-index:7;width:56px;height:56px;border-radius:50%;background:var(--pe);color:#2a1408;justify-content:center;font-size:25px;box-shadow:0 0 0 2px var(--g)}
+.cap small{font:700 12.5px var(--u);color:var(--co)}.cap h1{font:700 36px/1.05 var(--h)}.cap p{font:14px/1.28 var(--u);color:#33473d;margin-top:2px}
+.phone{background:var(--g)}.screen{background:var(--sage)}
+.m-h{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 14px}.m-h .logo{padding:0;font-size:25px}.m-h span{font:700 18px var(--s)}
+.m .cin{margin:0 10px 8px;height:44px;font-size:15px;padding-left:15px}.m .save{height:34px;padding:0 15px;font-size:14px}
+.m .c{margin:0 10px 8px;padding:9px 12px 9px}
+.m .c.alta h3{font-size:25px;margin:4px 0 2px}.m .c.alta .act{margin-top:6px}
+.m .c.done{padding:7px 12px}.m .c.done h3{font-size:16px;margin:0}.m .c.done .meta{display:none}.m .c.done .act{margin-top:2px}.m .c.done .act button{height:24px}
+.m .act button{height:29px}
+.m-gh{position:absolute;left:186px;right:10px;top:318px;height:320px;border:2px dashed #7f9682;border-radius:18px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:16px;font:14px var(--u);color:var(--mute)}
+.dr{position:absolute;left:0;top:310px;width:176px;height:336px;background:var(--g);color:var(--cream);border-radius:0 20px 20px 0;z-index:3;padding-top:7px}
+.dr .lb{padding:0 12px 3px;font-size:12.5px}
+.df{display:flex;justify-content:space-between;align-items:center;height:36px;padding:0 14px 0 12px;font:16px var(--s)}.df b{font:600 16px var(--u)}
+.df.on{background:var(--sage);color:var(--g);border-radius:18px 0 0 18px;margin-left:5px;padding-left:9px;font-weight:700}
+.df.over{position:relative;height:52px;width:210px;background:var(--pe);color:#2a1408;border-radius:0 26px 26px 0;justify-content:flex-start;gap:8px;font-weight:700;font-size:18px;z-index:4}.df.over small{display:block;font:600 11.5px var(--u)}
+.db{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;height:44px;border-top:1px solid #356353;padding:0 11px;font:600 12.5px var(--u)}.db span{display:flex;align-items:center;gap:4px}
+.m-drag{position:absolute;left:180px;top:470px;width:184px;background:var(--cream);border-radius:15px;padding:8px 12px;transform:rotate(-2.5deg);z-index:6;box-shadow:0 0 0 2.5px var(--pe),6px 8px 0 rgba(18,63,47,.32)}.m-drag h3{font-size:18px;margin:3px 0 0}
+.m-ai{left:9px;right:9px;bottom:10px;font-size:13.5px}.m-ai .msg{font-size:15.5px;margin:8px 13px 6px}.m-ai .res{padding:0 13px}.m-ai .undo{margin:8px 13px 10px}.m-ai .ai-h{padding:6px 13px}
+</style></head><body><svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="undo" viewBox="0 0 24 24"><path d="M8 4L4 8l4 4M4 8h10a6 6 0 0 1 0 12h-4"/></symbol>
+<symbol id="retry" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.2 6.5M20 4.5V11h-6.5"/></symbol>
+<symbol id="task" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="2"/><path d="M4 10.5h16M8 3v4M16 3v4"/></symbol>
+<symbol id="idea" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+<symbol id="cart" viewBox="0 0 24 24"><path d="M3 4h2.5l2.3 11h10.4l2-8H6.3"/><circle cx="9.5" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></symbol>
+<symbol id="note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM15 3v4h4M8.5 12h7M8.5 16h7"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H11l-4.5 4v-4H4z"/><path d="M8.5 10.5h7"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+<symbol id="alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></symbol>
+<symbol id="drop" viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M4 21h16"/></symbol>
+<symbol id="board" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="14" rx="1"/></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><path d="M3 5h5M3 12h5M3 19h5"/><rect x="11" y="4" width="10" height="7" rx="1"/><rect x="11" y="14" width="10" height="6" rx="1"/></symbol>
+<symbol id="pin" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M10 4v16"/></symbol></defs></svg><div class="stage">
+<section class="desk"><div class="bar"><b></b><b></b><b></b><span>127.0.0.1:8000</span></div><nav class="nav"><div class="logo">dumpbox</div><div class="lb">Pastas</div><div class="f">Casa<b>5</b></div><div class="f on">Trabalho<b>8</b></div><div class="f">Freelance<b>3</b></div><div class="f">Estudos<b>3</b></div><div class="f over"><b>3</b><div>Saúde<small>solte para mover</small></div></div><div class="f">Finanças<b>3</b></div><div class="f">Outro<b>2</b></div><div class="bin"><h5><svg class="i"><use href="#trash"/></svg>Lixeira<b>3</b></h5><div class="t"><span>Comprar café e pão</span><button class="del">Apagar</button></div><div class="t"><span>Comprar café e pão</span><button class="del">Apagar</button></div><div class="t"><span>Ligar para a seguradora</span><button class="del">Apagar</button></div></div></nav><main class="main"><div class="cin"><em>pagar luz amanhã, dentista sexta 14h, comprar café</em><button class="save">Guardar</button></div><div class="hd"><h2>Trabalho</h2><span>8 itens, 2 urgentes</span></div><div class="note"><b>Revisar</b><span>a IA não entendeu 2 notas:</span><span>"ver aquele negócio de terça"</span><button>Tentar de novo</button><span>"cmprr tb oq falei ontem"</span><button>Tentar de novo</button></div><div class="cols"><div class="cl"><article class="c alta"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots">alta<i><u class="on"></u><u class="on"></u><u class="on"></u></i></span></div><h3>Revisar proposta do cliente</h3><div class="due"><svg class="i"><use href="#clock"/></svg>hoje, 17h</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article><article class="c baixa"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots">baixa<i><u class="on"></u><u class=""></u><u class=""></u></i></span></div><h3>Atualizar planilha de horas</h3><div class="due"><svg class="i"><use href="#clock"/></svg>sexta</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article><article class="c baixa"><div class="meta"><span class="k"><svg class="i"><use href="#idea"/></svg>ideia</span><span class="dots">baixa<i><u class="on"></u><u class=""></u><u class=""></u></i></span></div><h3>Modelo de proposta reutilizável</h3><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article></div><div class="cl"><article class="c média"><div class="meta"><span class="k"><svg class="i"><use href="#cal"/></svg>compromisso</span><span class="dots">média<i><u class="on"></u><u class="on"></u><u class=""></u></i></span></div><h3>Reunião de alinhamento</h3><div class="due"><svg class="i"><use href="#clock"/></svg>quinta, 10h</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article><div class="ghost">saiu daqui</div><article class="c done"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots"><svg class="i"><use href="#check"/></svg>feito</span></div><h3>Enviar relatório mensal</h3><div class="act"><button><svg class="i"><use href="#retry"/></svg>Reabrir</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article><article class="c baixa"><div class="meta"><span class="k"><svg class="i"><use href="#cart"/></svg>compra</span><span class="dots">baixa<i><u class="on"></u><u class=""></u><u class=""></u></i></span></div><h3>Comprar suporte de notebook</h3><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article></div><div class="cl"><article class="c alta"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots">alta<i><u class="on"></u><u class="on"></u><u class="on"></u></i></span></div><h3>Renovar certificado digital</h3><div class="due"><svg class="i"><use href="#clock"/></svg>dia 28</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article></div></div></main><div class="c drag" style="left:262px;top:318px"><div class="meta"><span class="k"><svg class="i"><use href="#cal"/></svg>compromisso</span><span class="dots">média<i><u class="on"></u><u class="on"></u><u class=""></u></i></span></div><h3>Agendar exame periódico</h3><div class="due"><svg class="i"><use href="#clock"/></svg>segunda, 8h</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div><svg class="cursor" style="left:-16px;top:14px" viewBox="0 0 24 24"><path d="M5 2l15 11-6.5 1.2 3.7 6.8-3.2 1.7-3.6-6.9L5 20.5z"/></svg></div><div class="ai" style="right:20px;bottom:86px;width:344px"><div class="ai-h"><svg class="i"><use href="#chat"/></svg>Assistente<span class="x"><svg class="i"><use href="#x"/></svg></span></div><div class="msg">move o dentista pra Saúde e apaga os repetidos</div><div class="res"><p><svg class="i"><use href="#check"/></svg><span><b>Dentista sexta 14h</b> foi para Saúde</span></p><p><svg class="i"><use href="#check"/></svg><span><b>2 repetidos</b> de Comprar café e pão foram para a Lixeira</span></p></div><button class="undo"><svg class="i"><use href="#undo"/></svg>Desfazer</button><div class="ai-in"><span>Pede alguma coisa…</span><svg class="i"><use href="#send"/></svg></div></div><button class="fab" style="right:20px;bottom:18px"><svg class="i"><use href="#chat"/></svg></button></section>
+<aside class="side"><div class="cap"><small>OPÇÃO E · EVOLUÇÃO DA B</small><h1>Estufa</h1><p>Grade solta em que o urgente pesa no olhar. No celular a lateral some e só abre quando você segura um card.</p></div><div class="phone"><div class="screen"><div class="status"><span>9:41</span><i></i></div><div class="m-h"><div class="logo">dumpbox</div><span>Trabalho · 8</span></div><div class="m"><div class="cin"><em style="color:var(--mute)">despeja aqui…</em><button class="save">Guardar</button></div><article class="c alta"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots">alta<i><u class="on"></u><u class="on"></u><u class="on"></u></i></span></div><h3>Revisar proposta do cliente</h3><div class="due"><svg class="i"><use href="#clock"/></svg>hoje, 17h</div><div class="act"><button><svg class="i"><use href="#check"/></svg>Feito</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article><article class="c done"><div class="meta"><span class="k"><svg class="i"><use href="#task"/></svg>tarefa</span><span class="dots"><svg class="i"><use href="#check"/></svg>feito</span></div><h3>Enviar relatório mensal</h3><div class="act"><button><svg class="i"><use href="#retry"/></svg>Reabrir</button><button><svg class="i"><use href="#trash"/></svg>Excluir</button></div></article></div>
+<div class="m-gh">saiu daqui</div><div class="dr"><div class="lb">Solte numa pasta</div><div class="df">Casa<b>5</b></div><div class="df on">Trabalho<b>8</b></div><div class="df">Freelance<b>3</b></div><div class="df">Estudos<b>3</b></div><div class="df over"><b>3</b><div>Saúde<small>solte aqui</small></div></div><div class="df">Finanças<b>3</b></div><div class="df">Outro<b>2</b></div><div class="db"><span><svg class="i"><use href="#alert"/></svg>Revisar 2</span><span><svg class="i"><use href="#trash"/></svg>Lixeira 3</span></div></div>
+<div class="m-drag"><div class="meta"><span class="k"><svg class="i"><use href="#cal"/></svg>compromisso</span></div><h3>Agendar exame periódico</h3><svg class="cursor" style="left:-15px;top:26px" viewBox="0 0 24 24"><path d="M5 2l15 11-6.5 1.2 3.7 6.8-3.2 1.7-3.6-6.9L5 20.5z"/></svg></div>
+<div class="ai m-ai"><button class="fab" style="right:8px;top:-22px;width:44px;height:44px;font-size:20px"><svg class="i"><use href="#x"/></svg></button><div class="ai-h"><svg class="i"><use href="#chat"/></svg>Assistente</div><div class="msg">move o dentista pra Saúde e apaga os repetidos</div><div class="res"><p><svg class="i"><use href="#check"/></svg><span><b>Dentista sexta 14h</b> foi para Saúde</span></p><p><svg class="i"><use href="#check"/></svg><span><b>2 repetidos</b> de café foram para a Lixeira</span></p></div><button class="undo"><svg class="i"><use href="#undo"/></svg>Desfazer</button></div></div></div></aside>
+</div></body></html>

@@ -42,6 +42,15 @@ class Resultado:
     erro: str | None = None
 
 
+def finalizar(itens_ia, agora: datetime) -> list[Item]:
+    """ItemIA (saída do modelo) -> Item: data e prioridade por regra, nunca pela IA."""
+    itens = []
+    for i in itens_ia:
+        prazo = resolver_prazo(i.prazo_texto, agora)
+        itens.append(Item(**i.model_dump(), prazo_em=prazo, prioridade=prioridade(prazo, i.titulo, agora)))
+    return itens
+
+
 def classificar(texto: str, agora: datetime, modelo: str = "qwen2.5:1.5b", tentativas: int = 2) -> Resultado:
     t0, erro = time.perf_counter(), None
     # saída ~150 tokens por linha (um item cada): teto fixo cortava o JSON de colagens longas
@@ -62,11 +71,7 @@ def classificar(texto: str, agora: datetime, modelo: str = "qwen2.5:1.5b", tenta
             )
             r.raise_for_status()
             saida = SaidaIA.model_validate_json(r.json()["message"]["content"])
-            itens = []
-            for i in saida.itens:
-                prazo = resolver_prazo(i.prazo_texto, agora)
-                itens.append(Item(**i.model_dump(), prazo_em=prazo, prioridade=prioridade(prazo, i.titulo, agora)))
-            return Resultado(itens, modelo, PROMPT_V, int((time.perf_counter() - t0) * 1000))
+            return Resultado(finalizar(saida.itens, agora), modelo, PROMPT_V, int((time.perf_counter() - t0) * 1000))
         except (httpx.HTTPError, ValidationError, KeyError, ValueError) as e:
             erro = f"{type(e).__name__}: {e}"[:200]
     # nunca perder a nota: quem chamar manda o texto cru pra "revisar"

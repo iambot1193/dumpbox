@@ -63,8 +63,19 @@ function linha(it) {
 async function atualizar() {
   try {
     const { itens, revisar } = await api("/api/itens");
+    const alts = await api("/api/alteracoes");
     const el = $("lista"); el.replaceChildren();
     const grupo = (titulo, nos) => { if (!nos.length) return; const h = document.createElement("h2"); h.textContent = titulo; el.append(h, ...nos); };
+    // edições automáticas (instruções digitadas ou confirmadas no chat): tudo reversível
+    grupo("Alterações feitas", alts.filter(a => !a.desfeito).slice(0, 3).map(a => {
+      const d = document.createElement("div"); d.className = "item";
+      const t = document.createElement("div"); t.className = "t";
+      t.textContent = a.descricoes.slice(0, 4).join("\n") + (a.descricoes.length > 4 ? `\n… e mais ${a.descricoes.length - 4}` : "");
+      t.style.whiteSpace = "pre-wrap";
+      const b = document.createElement("button"); b.className = "sec"; b.textContent = "Desfazer";
+      b.onclick = async () => { await api("/api/desfazer", { grupo: a.grupo }); atualizar(); };
+      d.append(t, b); return d;
+    }));
     grupo("Revisar", revisar.map(c => {
       const d = document.createElement("div"); d.className = "item";
       const t = document.createElement("div"); t.className = "t";
@@ -75,6 +86,11 @@ async function atualizar() {
         const b = document.createElement("button"); b.className = "sec"; b.textContent = "Tentar de novo";
         b.onclick = async () => { await api(`/api/capturas/${c.id}/reprocessar`, {}); atualizar(); };
         d.append(b);
+        if ((c.erro || "").startsWith("instrução não aplicada")) {  // editor não achou o que mudar: dá pra guardar como nota comum
+          const n = document.createElement("button"); n.className = "sec"; n.textContent = "Guardar como anotação";
+          n.onclick = async () => { await api(`/api/capturas/${c.id}/como-nota`, {}); atualizar(); };
+          d.append(n);
+        }
       }
       return d;
     }));

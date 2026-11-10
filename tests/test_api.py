@@ -114,6 +114,141 @@ def test_chat():
     assert c.post("/api/chat", json={"mensagem": "x"}).status_code == 503
 
 
+def test_editor_aplica_instrucoes_e_desfaz():
+    import json
+
+    from dumpbox import chat, editor
+
+    assert editor.parece_comando("terminar ava devem ir para catálogo de estudos\ne também excluir os duplicados")
+    assert editor.parece_comando("EXCLUIR os antigos que estavam na lista errada")
+    assert editor.parece_comando("e tambem logicamente exlcuir os antigos q estavam na lista errada.")  # typo real
+    assert editor.parece_comando("tirar os duplciados")
+    assert editor.parece_comando("mover terminar ava para estudos")
+    assert editor.parece_comando("marca terminar artigo como feito")
+    assert not editor.parece_comando("trocar o óleo do carro dia 25")      # tarefa comum, não instrução
+    assert not editor.parece_comando("colocar gás na cozinha e finalizar o relatório")
+    assert not editor.parece_comando("comprar leite e pão amanhã")
+    assert not editor.parece_comando("estudar fastapi depois de amanhã e revisar sql dia 15")
+    assert not editor.parece_comando("reunião com o time hoje 16:30")
+
+    conn = db.conectar()
+    conn.execute("DELETE FROM alteracao")
+    conn.execute("DELETE FROM item")
+    conn.execute("INSERT OR IGNORE INTO captura(id,texto,criado_em,status) VALUES('cap-ed','x','2026-01-01','ok')")
+    ids = {}
+    for chave, titulo, ctx in [("a", "Revisar Relatórios do Portal!", "freelance"),
+                               ("c", "Terminar AVA", "freelance"),
+                               ("b", "revisar relatorios do portal", "freelance")]:  # b = repetido mais novo
+        ids[chave] = conn.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prioridade,estado,criado_em) "
+                                  "VALUES('cap-ed','tarefa',?,?,'baixa','catalogado','2026-01-01')", (titulo, ctx)).lastrowid
+    conn.commit()
+    assert chat.duplicados(conn) == [ids["a"]]  # fica o mais novo; ignora acento/caixa/pontuação
+
+    class R:
+        def __init__(self, corpo):
+            self.corpo = corpo
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": json.dumps(self.corpo)}}
+
+    chamadas = []  # o editor (schema com "acoes") e o classificador (schema com "itens") usam o mesmo httpx.post
+
+    def post_falso(*a, **k):
+        schema = k["json"]["format"]
+        chamadas.append(k["json"]["messages"][-1]["content"])
+        if "acoes" in schema["properties"]:
+            return R({"acoes": [
+                {"tipo": "contexto", "item_id": ids["c"], "valor": "estudos"},
+                {"tipo": "deduplicar"},
+                {"tipo": "estado", "item_id": 99999, "valor": "feito"},          # id inventado: ignorado
+                {"tipo": "estado", "item_id": ids["b"], "valor": "excluído"}]})   # sinônimo de arquivar
+        return R({"itens": [{"tipo": "compra", "titulo": "Comprar café", "contexto": "casa", "prazo_texto": "amanhã", "tags": []}]})
+
+    post_original = editor.httpx.post
+    editor.httpx.post = post_falso
+    try:
+        r = editor.interpretar(conn, "cap-ed", "terminar ava devem ir para estudos, excluir revisar relatorios do portal e os duplicados", datetime.now(), "fake")
+        assert len(chamadas) == 1  # só instrução: nenhuma linha sobra para o classificador
+        # texto MISTO: linha 1 é anotação nova, linha 2 é instrução -> a nova não pode se perder
+        chamadas.clear()
+        misto = editor.interpretar(conn, "cap-ed", "comprar café amanhã\nmover terminar ava para estudos", datetime.now(), "fake")
+        assert [i.titulo for i in misto.itens] == ["Comprar café"] and misto.itens[0].prazo_em is not None
+        assert chamadas == ["mover terminar ava para estudos", "comprar café amanhã"]  # cada um só vê a sua linha
+    finally:
+        editor.httpx.post = post_original
+    campo = lambda k, col: conn.execute(f"SELECT {col} FROM item WHERE id=?", (ids[k],)).fetchone()[0]
+    assert r.itens == [] and r.acoes_ignoradas == 1 and r.acoes_aplicadas == 3
+    assert campo("c", "contexto") == "estudos"
+    assert campo("a", "estado") == "arquivado" and campo("b", "estado") == "arquivado"
+    grupo = conn.execute("SELECT grupo FROM alteracao LIMIT 1").fetchone()[0]
+    assert conn.execute("SELECT count(*) FROM alteracao WHERE grupo=?", (grupo,)).fetchone()[0] == 3
+    # desfazer volta tudo; um campo editado depois da automação não é pisado
+    conn.execute("UPDATE item SET contexto='casa' WHERE id=?", (ids["c"],))
+    conn.commit()
+    assert chat.desfazer(conn, grupo) == 2
+    assert campo("a", "estado") == "catalogado" and campo("b", "estado") == "catalogado"
+    assert campo("c", "contexto") == "casa"  # edição manual posterior preservada
+    assert chat.desfazer(conn, grupo) == 0  # já desfeito
+
+
+def test_instrucao_sem_acao_vai_para_revisar():
+    """Instrução que o editor não consegue aplicar não vira item-lixo nem some: fica em Revisar, e dá pra forçar como nota."""
+    import json
+
+    from dumpbox import editor
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": json.dumps({"acoes": [
+                {"tipo": "estado", "item_id": 99999, "valor": "arquivado"}]})}}
+
+    original = editor.httpx.post
+    editor.httpx.post = lambda *a, **k: R()
+    try:
+        conn = db.conectar()
+        r = editor.interpretar(conn, "cap-x", "excluir os antigos", datetime.now(), "fake")
+    finally:
+        editor.httpx.post = original
+    assert r.itens is None and r.erro == editor.ERRO_INSTRUCAO
+
+    # item existe mas não foi citado na linha: ação recusada (modelo não pode mexer no que o usuário não pediu)
+    alvo = conn.execute("SELECT id FROM item WHERE titulo='Terminar AVA'").fetchone()[0]
+
+    def post_parcial(*a, **k):
+        linha = k["json"]["messages"][-1]["content"]
+        class P(R):
+            def json(self):
+                acoes = [{"tipo": "contexto", "item_id": alvo, "valor": "financas"}]
+                return {"message": {"content": json.dumps({"acoes": acoes})}}
+        return P()
+
+    editor.httpx.post = post_parcial
+    try:
+        r = editor.interpretar(conn, "cap-x", "mover terminar ava para financas\nexcluir aquele negocio velho", datetime.now(), "fake")
+    finally:
+        editor.httpx.post = original
+    assert r.acoes_aplicadas == 1 and r.acoes_ignoradas == 1 and r.itens == []
+    assert conn.execute("SELECT contexto FROM item WHERE id=?", (alvo,)).fetchone()[0] == "financas"
+    resto = conn.execute("SELECT status, erro FROM captura WHERE texto='excluir aquele negocio velho' AND origem='editor'").fetchone()
+    assert resto[:] == ("falhou", editor.ERRO_INSTRUCAO)  # só a linha não entendida vai pra Revisar
+
+    c = TestClient(api.app)
+    auth._tentativas.clear()
+    assert c.post("/api/login", json={"senha": "senha-certa"}).status_code == 200
+    conn.execute("INSERT INTO captura(id,texto,criado_em,status,erro) VALUES('cap-fx','excluir os antigos','2026-01-02','falhou',?)",
+                 (editor.ERRO_INSTRUCAO,))
+    conn.commit()
+    assert c.post("/api/capturas/cap-fx/como-nota").status_code == 200
+    assert conn.execute("SELECT status, erro FROM captura WHERE id='cap-fx'").fetchone()[:] == ("pendente", "forcar_nota")
+    assert c.post("/api/capturas/cap-fx/como-nota").status_code == 404  # já não está 'falhou'
+
+
 def test_primeiro_uso_e_modelo():
     from dumpbox import ollama_mgr, setup
 
@@ -161,6 +296,8 @@ def test_rate_limit_e_token():
 if __name__ == "__main__":
     test_fluxo()
     test_chat()
+    test_editor_aplica_instrucoes_e_desfaz()
+    test_instrucao_sem_acao_vai_para_revisar()
     test_primeiro_uso_e_modelo()
     test_rate_limit_e_token()
     print("ok")

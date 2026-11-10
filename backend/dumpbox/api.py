@@ -11,7 +11,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, chat, classifier, db, ollama_mgr, setup
+from . import auth, chat, classifier, db, editor, ollama_mgr, setup
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
 WEB = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "web"
@@ -20,8 +20,11 @@ WEB = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "web
 def processar_pendentes(c) -> int:
     """Classifica capturas pendentes, uma por vez. Retorna quantas processou."""
     n = 0
-    for row in c.execute("SELECT id, texto FROM captura WHERE status='pendente' ORDER BY criado_em").fetchall():
-        r = classifier.classificar(row["texto"], datetime.now(), ollama_mgr.modelo())
+    for row in c.execute("SELECT id, texto, erro FROM captura WHERE status='pendente' ORDER BY criado_em").fetchall():
+        if row["erro"] != "forcar_nota" and editor.parece_comando(row["texto"]):  # instrução de edição: aplica (reversível) + cria só o que for novo
+            r = editor.interpretar(c, row["id"], row["texto"], datetime.now(), ollama_mgr.modelo())
+        else:
+            r = classifier.classificar(row["texto"], datetime.now(), ollama_mgr.modelo())
         db.salvar_resultado(c, row["id"], r)
         n += 1
     return n
@@ -162,6 +165,38 @@ def mudar_estado(item_id: int, body: NovoEstado, c=Depends(conexao)):
 def reprocessar(captura_id: str, c=Depends(conexao)):
     """Põe uma captura que falhou de volta na fila (o texto original nunca foi alterado)."""
     cur = c.execute("UPDATE captura SET status='pendente', erro=NULL WHERE id=? AND status='falhou'", (captura_id,))
+    c.commit()
+    if cur.rowcount == 0:
+        raise HTTPException(404, "captura não encontrada ou não falhou")
+    return {"ok": True}
+
+
+@app.get("/api/alteracoes", dependencies=[Depends(exige_login)])
+def alteracoes(c=Depends(conexao)):
+    """Últimos grupos de edições automáticas (do editor e do chat), com o que mudou, para Desfazer."""
+    grupos = [r["grupo"] for r in c.execute(
+        "SELECT grupo FROM alteracao GROUP BY grupo ORDER BY MAX(id) DESC LIMIT 8")]
+    saida = []
+    for g in grupos:
+        linhas = c.execute("SELECT descricao, desfeito FROM alteracao WHERE grupo=? ORDER BY id", (g,)).fetchall()
+        saida.append({"grupo": g, "descricoes": [l["descricao"] for l in linhas],
+                      "desfeito": all(l["desfeito"] for l in linhas)})
+    return saida
+
+
+class IdGrupo(BaseModel):
+    grupo: str = Field(min_length=8, max_length=64)
+
+
+@app.post("/api/desfazer", dependencies=[Depends(exige_login)])
+def desfazer(body: IdGrupo, c=Depends(conexao)):
+    return {"revertidas": chat.desfazer(c, body.grupo)}
+
+
+@app.post("/api/capturas/{captura_id}/como-nota", dependencies=[Depends(exige_login)])
+def como_nota(captura_id: str, c=Depends(conexao)):
+    """Instrução que o editor não conseguiu aplicar: o usuário manda tratar o texto como anotação comum."""
+    cur = c.execute("UPDATE captura SET status='pendente', erro='forcar_nota' WHERE id=? AND status='falhou'", (captura_id,))
     c.commit()
     if cur.rowcount == 0:
         raise HTTPException(404, "captura não encontrada ou não falhou")

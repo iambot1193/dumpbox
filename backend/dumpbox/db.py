@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS item(
 CREATE TABLE IF NOT EXISTS classificacao(
   id INTEGER PRIMARY KEY AUTOINCREMENT, captura_id TEXT NOT NULL, modelo TEXT, prompt_v TEXT,
   latencia_ms INTEGER, valido INTEGER, erro TEXT, criado_em TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS alteracao(  -- diário de edições automáticas: base do "Desfazer"
+  id INTEGER PRIMARY KEY AUTOINCREMENT, grupo TEXT NOT NULL, captura_id TEXT, item_id INTEGER NOT NULL,
+  campo TEXT NOT NULL, antes TEXT, depois TEXT, descricao TEXT, criado_em TEXT NOT NULL,
+  desfeito INTEGER NOT NULL DEFAULT 0);
 """
 
 

@@ -23,6 +23,16 @@ tailscale serve --bg 8000                                # depois de instalar o 
 - Build local `build.ps1`; CI em `.github/workflows/release.yml` roda os testes, gera o exe e anexa à release de tags `v*`.
 - Limites conhecidos: exe não assinado (SmartScreen avisa), possível falso positivo de antivírus, só Windows (no Linux/Mac o dev instala o Ollama), sem retomar download interrompido.
 
+### Editor inteligente (caixa de notas)
+O texto digitado pode misturar anotações novas e instruções sobre itens existentes (`editor.py`):
+1. Cada linha passa por um detector determinístico (regex estrita + fuzzy para digitação). O modelo não decide o que é instrução: quando decidia, perdia anotações novas.
+2. Cada instrução vai sozinha ao modelo (juntas, ele trocava os destinos) e volta só como ações.
+3. A ação só vale se o item for citado na linha (≥60% das palavras do título).
+4. Tudo é aplicado na hora e é reversível: "excluir" arquiva, e o diário `alteracao` alimenta o botão Desfazer. Duplicados são achados por regra (título normalizado, fica o mais novo).
+5. Linhas sem instrução vão para o classificador. Instrução sem ação válida vai para Revisar, com "Tentar de novo" e "Guardar como anotação".
+
+Limite: lista em várias linhas com o destino só na última tem as primeiras linhas tratadas como anotações novas.
+
 ### Chat (aba "Chat")
 Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). O modelo **só propõe**: cada ação (criar, estado, prazo, contexto, prioridade) é validada pelo servidor (item existe, enum válido, data resolvida por regra) e só é aplicada após **Confirmar** na tela; propostas expiram em 15 min e valem uma vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
 

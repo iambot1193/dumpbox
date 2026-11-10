@@ -28,7 +28,11 @@ async function estado() {
     el.hidden = p.pronto;
     if (!p.pronto) el.textContent = p.erro ? `Erro ao preparar a IA: ${p.erro}` : `Preparando a IA (só na primeira vez): ${p.msg || "aguarde"} ${p.pct ? p.pct + "%" : ""}`;
     return e;
-  } catch { return null; }
+  } catch {
+    const el = $("prep"); el.hidden = false;
+    el.textContent = "Sem conexão com o servidor. O dumpbox.exe está aberto no PC? Suas notas ficam na fila e são enviadas quando ele voltar.";
+    return null;
+  }
 }
 
 async function enviarFila() {
@@ -138,7 +142,11 @@ async function enviarChat() {
     hist.push({ role: "user", content: m }, { role: "assistant", content: r.resposta });
     esp.textContent = r.resposta;
     r.propostas.forEach(proposta);
-  } catch (e) { esp.textContent = String(e.message) === "503" ? "Modelo indisponível: o Ollama está ligado no PC?" : "Erro ao falar com o servidor."; }
+  } catch (e) {
+    const s = String(e.message);
+    esp.textContent = s === "503" ? "Modelo indisponível: a IA ainda está sendo preparada ou o Ollama está desligado no PC." :
+      /^\d+$/.test(s) ? `Erro ${s} no servidor.` : "Sem conexão com o servidor. O dumpbox.exe está aberto no PC?";
+  }
 }
 $("cenviar").onclick = enviarChat;
 $("cmsg").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarChat(); } });

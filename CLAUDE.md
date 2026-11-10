@@ -17,3 +17,4 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 - Repo público: nada em `data/private/`, `.env`, `.gguf`.
 - Arquivos pesados em D:, nunca no C:.
 - Saída curta: `pytest -q`, `head`, sem despejar logs.
+- Testes com o exe: encerrar SÓ pelo PID que iniciei (nunca `Get-Process dumpbox | Stop-Process`): pode matar a instância do usuário.

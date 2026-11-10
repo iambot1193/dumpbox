@@ -17,6 +17,23 @@ Telegram bot (lembretes/captura) ------------------> mesma fila
 - **A IA não calcula datas.** O modelo copia o trecho (`prazo_texto`); um parser determinístico em pt-BR resolve a data e a prioridade.
 - Saída do modelo forçada por JSON Schema (gerado do Pydantic).
 
+## Instalação (qualquer PC, sem Tailscale)
+
+```bash
+pip install -r requirements.txt
+ollama pull qwen2.5:7b                      # PC fraco: qwen2.5:1.5b (menos preciso, ver benchmark)
+PYTHONPATH=backend python -m dumpbox.setup  # cria a senha (grava só o hash em data/private/)
+python -m uvicorn dumpbox.api:app --app-dir backend    # http://127.0.0.1:8000
+```
+
+No Windows, `iniciar.ps1` sobe o Ollama e o servidor juntos (ajuste `OLLAMA_EXE`/`OLLAMA_MODELS` se não for o caminho padrão).
+
+### Acessar de outro aparelho (opcional)
+O projeto não depende de nenhum serviço de rede. Escolha o que preferir:
+- **Mesma rede Wi-Fi:** `--host 0.0.0.0` e abra `http://<ip-do-pc>:8000` (HTTP, só em rede confiável).
+- **Fora de casa:** VPN privada como [Tailscale](https://tailscale.com) (`tailscale serve --bg 8000` dá HTTPS) ou um túnel como Cloudflare Tunnel. Com HTTPS, defina `DUMPBOX_COOKIE_SECURE=1`.
+- Nunca exponha a porta direto na internet (port-forward): o login é de usuário único e simples.
+
 ## Avaliação
 
 ```bash

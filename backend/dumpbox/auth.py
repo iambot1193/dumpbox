@@ -6,6 +6,8 @@ import secrets
 import sys
 import time
 
+from . import config  # noqa: F401  (carrega data/private/config.env antes de ler o ambiente)
+
 SESSAO_S = 7 * 24 * 3600
 _SEGREDO = os.getenv("DUMPBOX_SECRET") or secrets.token_hex(32)  # sem env: sessões morrem ao reiniciar
 _tentativas: dict[str, list[float]] = {}

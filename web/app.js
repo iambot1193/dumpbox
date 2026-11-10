@@ -73,3 +73,39 @@ window.addEventListener("online", () => { enviarFila().then(atualizar); });
 setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); } }, 5000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 iniciar();
+
+// ---- Chat: o servidor PROPÕE ações; nada muda até clicar em Confirmar ----
+const hist = [];
+function aba(n) {
+  $("aba-notas").hidden = n !== "notas"; $("aba-chat").hidden = n !== "chat";
+  $("t-notas").classList.toggle("on", n === "notas"); $("t-chat").classList.toggle("on", n === "chat");
+}
+$("t-notas").onclick = () => aba("notas");
+$("t-chat").onclick = () => { aba("chat"); $("cmsg").focus(); };
+function bolha(papel, texto) {
+  const d = document.createElement("div"); d.className = "b " + papel; d.textContent = texto;
+  $("msgs").append(d); d.scrollIntoView({ block: "end" }); return d;
+}
+function proposta(p) {
+  const d = document.createElement("div"); d.className = "b prop";
+  const t = document.createElement("div"); t.textContent = p.descricao;
+  const ok = document.createElement("button"); ok.className = "sec"; ok.textContent = "Confirmar";
+  const no = document.createElement("button"); no.className = "sec"; no.textContent = "Cancelar";
+  const fim = txt => d.replaceChildren(document.createTextNode(txt));
+  ok.onclick = async () => { try { await api("/api/chat/confirmar", { id: p.id }); fim("✓ " + p.descricao); atualizar(); } catch { fim("Não foi possível aplicar (expirou ou já foi usada)."); } };
+  no.onclick = async () => { try { await api("/api/chat/cancelar", { id: p.id }); } catch {} fim("✗ Cancelado: " + p.descricao); };
+  d.append(t, ok, no); $("msgs").append(d); d.scrollIntoView({ block: "end" });
+}
+async function enviarChat() {
+  const m = $("cmsg").value.trim(); if (!m) return;
+  $("cmsg").value = ""; bolha("u", m);
+  const esp = bolha("a", "…");
+  try {
+    const r = await api("/api/chat", { mensagem: m, historico: hist.slice(-6) });
+    hist.push({ role: "user", content: m }, { role: "assistant", content: r.resposta });
+    esp.textContent = r.resposta;
+    r.propostas.forEach(proposta);
+  } catch (e) { esp.textContent = String(e.message) === "503" ? "Modelo indisponível: o Ollama está ligado no PC?" : "Erro ao falar com o servidor."; }
+}
+$("cenviar").onclick = enviarChat;
+$("cmsg").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarChat(); } });

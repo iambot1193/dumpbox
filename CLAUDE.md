@@ -4,12 +4,13 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 
 ## Comandos
 - Testes: `python tests/test_rules.py` e `PYTHONUTF8=1 python tests/test_api.py` (API sem Ollama)
-- Servidor: `uvicorn dumpbox.api:app --app-dir backend --port 8000` (env: DUMPBOX_PASSWORD_HASH, DUMPBOX_SECRET)
+- Senha (1x): `PYTHONPATH=backend python -m dumpbox.setup` → `data/private/config.env`. Servidor: `.\iniciar.ps1`
+- Chat (`chat.py`): modelo só propõe ações, usuário confirma; nunca gravar direto.
 - Avaliar: `python eval/run_eval.py qwen2.5:1.5b` (precisa Ollama: `$env:OLLAMA_MODELS="D:\Ollama\models"; D:\Ollama\ollama.exe serve`)
 - Schema: `PYTHONUTF8=1 PYTHONPATH=backend python -m dumpbox.schema > schema/saida_ia.schema.json`
 
 ## Regras
-- Escritor único: só o celular altera itens; PC devolve propostas.
+- Servidor (SQLite) é a fonte da verdade; navegador só guarda fila offline de capturas.
 - Datas e prioridade por regra (`rules.py`), nunca pela IA.
 - Repo público: nada em `data/private/`, `.env`, `.gguf`.
 - Arquivos pesados em D:, nunca no C:.

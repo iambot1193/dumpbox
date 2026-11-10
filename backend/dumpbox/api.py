@@ -10,7 +10,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, classifier, db
+from . import auth, chat, classifier, db
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 MODELO = os.getenv("DUMPBOX_MODEL", "qwen2.5:7b")
@@ -117,6 +117,43 @@ def mudar_estado(item_id: int, body: NovoEstado, c=Depends(conexao)):
     c.commit()
     if cur.rowcount == 0:
         raise HTTPException(404, "item não existe")
+    return {"ok": True}
+
+
+class Turno(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(max_length=2000)
+
+
+class MsgChat(BaseModel):
+    mensagem: str = Field(min_length=1, max_length=1000)
+    historico: list[Turno] = Field(default_factory=list, max_length=6)
+
+
+class IdProposta(BaseModel):
+    id: str = Field(min_length=4, max_length=40)
+
+
+@app.post("/api/chat", dependencies=[Depends(exige_login)])
+def conversar(body: MsgChat, c=Depends(conexao)):
+    try:
+        return chat.conversar(c, body.mensagem, [t.model_dump() for t in body.historico])
+    except RuntimeError:
+        raise HTTPException(503, "modelo indisponível (Ollama ligado?)")
+
+
+@app.post("/api/chat/confirmar", dependencies=[Depends(exige_login)])
+def confirmar(body: IdProposta, c=Depends(conexao)):
+    try:
+        chat.confirmar(c, body.id)
+    except KeyError:
+        raise HTTPException(404, "proposta expirada ou já usada")
+    return {"ok": True}
+
+
+@app.post("/api/chat/cancelar", dependencies=[Depends(exige_login)])
+def cancelar(body: IdProposta):
+    chat.cancelar(body.id)
     return {"ok": True}
 
 

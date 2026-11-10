@@ -21,6 +21,14 @@ h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .t{flex:1}.m{font-size:.8rem;color:var(--mut)}
 .alta{border-left:4px solid var(--bad)}.media{border-left:4px solid var(--ac)}
 #st{font-size:.85rem;color:var(--mut);margin-top:6px;min-height:1.2em}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button{margin:0;background:var(--card);color:var(--mut)}.tabs button.on{background:var(--ac);color:#fff}
+#msgs{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:55vh;overflow:auto}
+.b{padding:10px 12px;border-radius:12px;max-width:88%;white-space:pre-wrap;word-break:break-word}
+.b.u{background:var(--ac);color:#fff;align-self:flex-end}.b.a{background:var(--card)}
+.b.prop{background:var(--card);border:1px dashed var(--ac);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.b.prop div{flex:1 1 100%}
+#cbox{display:flex;gap:8px}#cbox textarea{min-height:48px;flex:1}#cbox button{width:auto;margin:0}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -31,10 +39,17 @@ h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
   <button id="entrar">Entrar</button><div id="err" class="m"></div>
 </section>
 <section id="app" hidden>
-  <textarea id="txt" placeholder="Despeje tudo aqui, solto, misturado…"></textarea>
-  <button id="guardar">Guardar</button>
-  <div id="st"></div>
-  <div id="lista"></div>
+  <div class="tabs"><button id="t-notas" class="on">Notas</button><button id="t-chat">Chat</button></div>
+  <div id="aba-notas">
+    <textarea id="txt" placeholder="Despeje tudo aqui, solto, misturado…"></textarea>
+    <button id="guardar">Guardar</button>
+    <div id="st"></div>
+    <div id="lista"></div>
+  </div>
+  <div id="aba-chat" hidden>
+    <div id="msgs"><div class="b a">Pergunte sobre suas notas ou peça mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda"). Eu proponho, você confirma.</div></div>
+    <div id="cbox"><textarea id="cmsg" placeholder="Mensagem…"></textarea><button id="cenviar">Enviar</button></div>
+  </div>
   <p><button class="sec" id="sair">sair</button></p>
 </section>
 </main>

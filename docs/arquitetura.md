@@ -11,12 +11,13 @@ Substitui o app Kotlin (as seções abaixo sobre Android ficam como histórico/o
 
 ### Rodar
 ```powershell
-$env:DUMPBOX_PASSWORD_HASH = python -m dumpbox.auth "sua senha"   # com PYTHONPATH=backend
-$env:DUMPBOX_SECRET = "<hex aleatório>"      # mantém a sessão após reiniciar
-$env:OLLAMA_MODELS = "D:\Ollama\models"; D:\Ollama\ollama.exe serve
-uvicorn dumpbox.api:app --app-dir backend --host 127.0.0.1 --port 8000
-tailscale serve --bg 8000                    # depois de instalar o Tailscale
+$env:PYTHONPATH = "backend"; python -m dumpbox.setup     # 1x: cria a senha (grava só o hash em data/private/config.env)
+.\iniciar.ps1                                            # sobe Ollama + servidor em http://127.0.0.1:8000
+tailscale serve --bg 8000                                # depois de instalar o Tailscale: URL HTTPS privada
 ```
+
+### Chat (aba "Chat")
+Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). O modelo **só propõe**: cada ação (criar, estado, prazo, contexto, prioridade) é validada pelo servidor (item existe, enum válido, data resolvida por regra) e só é aplicada após **Confirmar** na tela; propostas expiram em 15 min e valem uma vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
 
 ## Decisões (histórico, parte Android)
 - **Android nativo (Kotlin), Android-only.** StatCounter jun-ago/2026: ~68% mundo, ~75-79% Brasil.

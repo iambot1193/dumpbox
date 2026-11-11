@@ -3,7 +3,8 @@
 const $ = id => document.getElementById(id);
 const FILA = "dumpbox.fila", VISTA = "dumpbox.vista";
 const lerFila = () => { try { return JSON.parse(localStorage.getItem(FILA) || "[]"); } catch { return []; } };
-const gravaFila = f => { try { localStorage.setItem(FILA, JSON.stringify(f)); } catch {} };
+const gravaFila = f => { try { localStorage.setItem(FILA, JSON.stringify(f)); return true; } catch { return false; } };
+const horaLocal = (d = new Date()) => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 19);  // hora local sem fuso, como o servidor
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 
 // pastas vêm do servidor (o usuário cria e apaga); esta lista só vale até a primeira resposta
@@ -78,7 +79,7 @@ function mostrarFila() {
 async function enviarFila() {
   let fila = lerFila();
   for (const n of [...fila]) {
-    try { await api("/api/capturas", n); fila = fila.filter(x => x.id !== n.id); gravaFila(fila); }
+    try { await api(n.imagem ? "/api/capturas/imagem" : "/api/capturas", n); fila = fila.filter(x => x.id !== n.id); gravaFila(fila); }
     catch (e) { if (String(e.message) === "401") return; break; }
   }
   mostrarFila();
@@ -439,7 +440,7 @@ function redimensionavel(alca, card, it, p) {
 
 // ---- desenho ----
 function cartao(it, comPasta) {
-  const a = el("article", `c ${nivel(it)[0]} ${it.estado}${sel.has(it.id) ? " sel" : ""}`);
+  const a = el("article", `c t-${it.tipo || "nota"} ${nivel(it)[0]} ${it.estado}${sel.has(it.id) ? " sel" : ""}`);
   a.dataset.id = it.id;
   a.addEventListener("click", e => clicarCard(e, it.id));
   const k = el("span", "k"); k.append(ic(document.getElementById(it.tipo) ? it.tipo : "nota"), it.tipo || "nota");
@@ -611,10 +612,40 @@ const crescer = () => { const t = $("txt"); t.style.height = "auto"; t.style.hei
 $("txt").addEventListener("input", crescer);
 $("txt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("guardar").click(); } });
 $("guardar").onclick = async () => {
-  const texto = $("txt").value.trim(); if (!texto) return;
-  const f = lerFila(); f.push({ id: uuid(), texto }); gravaFila(f);
-  $("txt").value = ""; crescer(); await enviarFila(); atualizar();
+  const texto = $("txt").value.trim(); if (!texto && !anexo) return;
+  const f = lerFila(); f.push(anexo ? { id: uuid(), imagem: anexo, texto, criado_em: horaLocal() } : { id: uuid(), texto, criado_em: horaLocal() });
+  if (!gravaFila(f)) { toast("Sem espaço para guardar a foto offline. Envie com o PC ligado."); return; }
+  if (anexo) toast("Foto enviada: a IA lê a lista e cria os itens (pode levar 1 min).");
+  $("txt").value = ""; anexar(null); crescer(); await enviarFila(); atualizar();
 };
+
+// foto de lista: reduz no navegador (lado maior 1280 px, JPEG) e entra na mesma fila das notas
+async function reduzir(arq) {
+  const bmp = await createImageBitmap(arq), k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+$("foto").querySelector("input").onchange = e => { const arq = e.target.files[0]; e.target.value = ""; if (arq) enviarFoto(arq); };
+// Ctrl+V de print (Win+Shift+S) em qualquer lugar da tela, menos na caixa da IA; texto colado segue normal
+document.addEventListener("paste", e => {
+  if (e.target.closest?.(".ai-in")) return;
+  const arq = [...(e.clipboardData?.items || [])].find(i => i.kind === "file" && i.type.startsWith("image/"))?.getAsFile();
+  if (arq) { e.preventDefault(); enviarFoto(arq); }
+});
+// foto não vai sozinha: fica anexada (miniatura) até o Guardar, junto com o que for escrito como instrução
+let anexo = null;
+function anexar(b64) {
+  anexo = b64;
+  const a = $("anexo"); a.hidden = !b64;
+  if (b64) a.querySelector("img").src = "data:image/jpeg;base64," + b64;
+  $("txt").placeholder = b64 ? "Instruções para a foto (opcional): “tudo do trabalho, pra sexta”…" : "Despeje tudo aqui, solto, misturado…";
+}
+$("anexo").querySelector("button").onclick = () => { anexar(null); $("txt").focus(); };
+async function enviarFoto(arq) {
+  try { anexar(await reduzir(arq)); } catch { toast("Não consegui abrir essa imagem."); return; }
+  $("txt").focus();
+}
 
 // ---- login ----
 $("entrar").onclick = async () => {

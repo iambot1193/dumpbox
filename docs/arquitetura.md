@@ -57,6 +57,7 @@ Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "ad
 - `item(id, captura_id, tipo, titulo, contexto = slug da pasta, prazo_texto, prazo_em, prioridade[critica|alta|media|baixa], tags, estado[catalogado|feito|arquivado], criado_em, grade_col, grade_lin, grade_larg, grade_alt)`.
 - `pasta(slug, nome, descricao, ordem, criado_em)`: semeada com as 7 padrão; `outro` é fixa.
 - `alteracao(grupo, captura_id, item_id, campo, antes, depois, descricao, desfeito)`: diário de toda mudança da tela, do editor e da IA; um grupo = um Desfazer. Também é a fonte dos exemplos que a IA aprende (`db.exemplos`).
+- `imagem(captura_id, dados)`: foto em base64 esperando a IA; apagada quando vira itens (captura `origem=imagem`).
 - `classificacao(captura_id, modelo, prompt_v, latencia_ms, valido, erro)`: auditoria de cada chamada.
 
 ### Testes

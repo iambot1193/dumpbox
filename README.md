@@ -2,7 +2,7 @@
 
 Despeje texto solto, a IA cataloga. Notas viram itens com tipo, pasta, prazo e criticidade. Roda 100% local (Ollama no PC), sem nuvem.
 
-> Status: classificador + avaliação, **API + PWA com login**, editor inteligente e a tela de pastas prontos. Falta: bot Telegram, modo demo, entrada por imagem.
+> Status: classificador + avaliação, **API + PWA com login**, editor inteligente, tela de pastas e **foto de lista virando itens** prontos. Falta: modo demo (app no celular sem o PC), bot Telegram.
 
 ## Como funciona
 
@@ -80,16 +80,27 @@ python eval/run_eval.py qwen2.5:7b data/private/casos.jsonl   # suas notas reais
 
 Métricas: JSON válido, acerto do nº de itens (split), tipo, contexto, prazo, latência p50.
 
-### Resultados
+### Resultados (texto)
 
 | modelo | json válido | split | tipo | contexto | prazo | p50 |
 |---|---|---|---|---|---|---|
 | qwen2.5:1.5b, prompt v1 | 100% | 93% | 73% | 29% | 80%* | 2,7 s |
 | qwen2.5:1.5b, prompt v2 | 100% | 93% | 53% | 73% | 87% | 2,4 s |
 | qwen2.5:7b, prompt v2 | 100% | 98% | 96% | 89% | 98% | 3,2 s |
-| **qwen2.5:7b, prompt v2 atual** | 100% | 98% | 96% | 87% | 98% | 3,2 s |
+| qwen2.5:7b, prompt v2 atual (46 casos) | 100% | 98% | 96% | 87% | 98% | 3,2 s |
+| **qwen2.5:7b, v2 + regras de prazo (150 casos)** | 100% | 99% | 97% | 91% | 99% | 3,2 s |
 
-46 casos sintéticos, CPU (sem GPU), p50 por nota. *v1 medido antes de corrigir o parser de datas. Prompt v2 = definições fechadas + 3 exemplos fixos; "atual" = v2 com estudos ampliado (faculdade, AVA, artigo, TCC), um caso de diferença em contexto. Na prática o contexto melhora com os exemplos aprendidos do usuário, que o benchmark não usa.
+Casos sintéticos (46 até a v2; 150 desde as regras de prazo, com 3 datas-base, notas com data que não é prazo e listas de 2-3 itens), CPU (sem GPU), p50 por nota. Regras de prazo: item único cujo trecho não vira data é lido da nota inteira (o modelo corta "dia 4" em "4"), e `nota` nunca tem prazo. *v1 medido antes de corrigir o parser de datas. Prompt v2 = definições fechadas + 3 exemplos fixos; "atual" = v2 com estudos ampliado (faculdade, AVA, artigo, TCC), um caso de diferença em contexto. Na prática o contexto melhora com os exemplos aprendidos do usuário, que o benchmark não usa.
+
+### Foto de lista (visão)
+
+`qwen2.5vl:3b` transcreve e marca o que está feito; o classificador de texto cataloga. 24 checklists sintéticos (`python eval/gera_imagens.py`, depois `python eval/run_eval_visao.py`):
+
+| modelo | itens achados | inventados | marcado certo | caixa ✓ | caixa X | riscado | p50 |
+|---|---|---|---|---|---|---|---|
+| qwen2.5vl:3b | 100% | 1 | 89% | 100% | 92% | 76% | 9,6 s |
+
+Com JSON Schema o 3B devolvia lista vazia; o protocolo é texto (`item => marcada/vazia`). Texto riscado é o ponto fraco. Se o modelo marcar a lista inteira, nada é fechado sozinho.
 
 ## Estrutura
 
@@ -98,8 +109,8 @@ backend/dumpbox/   api.py (FastAPI), db.py (SQLite, pastas, lixeira), classifier
                    chat.py (ações + diário/Desfazer), rules.py (datas/prioridade), schema.py (contrato), ollama_mgr.py
 web/               PWA: index.html, app.js, sw.js, fonts/ (Barlow, OFL)
 tests/             test_rules.py, test_api.py, ui_browser.py
-eval/              harness de avaliação
-data/public/       casos sintéticos
+eval/              harness de avaliação (texto e visão) e gerador de checklists sintéticos
+data/public/       casos sintéticos e imagens de checklist geradas
 data/private/      notas reais (gitignored)
 docs/              arquitetura, decisões e mockups
 ```

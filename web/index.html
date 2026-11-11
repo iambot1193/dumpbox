@@ -49,6 +49,12 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .cin textarea::placeholder{color:var(--mute)}
 #guardar{background:var(--sig);color:var(--ink);font-weight:700;padding:0 24px;flex-direction:column;justify-content:center;gap:1px}
 #guardar small{font:12px var(--mono)}
+#foto{position:relative;display:flex;align-items:center;justify-content:center;width:52px;color:var(--mute);cursor:pointer;border-left:1px solid var(--line)}
+#foto:hover,#foto:focus-within{color:var(--txt)}#foto .i{width:24px;height:24px}
+#foto input{position:absolute;width:1px;height:1px;opacity:0}
+#anexo{position:relative;flex:none;margin:8px 0 8px 10px;align-self:flex-start}
+#anexo img{display:block;max-width:96px;max-height:72px;border:1px solid var(--line);object-fit:cover}
+#anexo button{position:absolute;right:-8px;top:-8px;width:22px;height:22px;justify-content:center;background:var(--txt);color:var(--ink);font-size:12px;border-radius:50%}
 .fila{display:flex;align-items:center;gap:7px;font:13px var(--mono);color:var(--mute);margin-top:8px;min-height:18px}
 .hd{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin:14px 0 14px}
 .hd h2{font-size:44px;font-weight:700;letter-spacing:-.8px;line-height:1}.hd>span{font:15px var(--mono);color:var(--mute)}
@@ -64,6 +70,9 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .c:hover,.c:focus-within{border-color:var(--txt)}
 .c.alta{background:var(--raise);border-left:4px solid var(--sig)}
 .c.critica{background:var(--raise);border-left:4px solid var(--late)}
+/* cor por tipo: faixa no topo + rótulo; a borda esquerda continua sendo da criticidade */
+.c{--tc:var(--mute);border-top:3px solid var(--tc)}.c:hover,.c:focus-within{border-top-color:var(--tc)}.c .k{color:var(--tc)}
+.t-tarefa{--tc:#6cb4ff}.t-compromisso{--tc:#c49bff}.t-ideia{--tc:#ffd75e}.t-compra{--tc:#4fd1b5}.t-nota{--tc:#b1b29d}
 .c.feito{background:transparent;border-style:dotted}.c.feito h3{color:var(--mute);text-decoration:line-through}
 .c.saiu{opacity:.25}
 .laco{position:fixed;z-index:44;border:1px solid var(--txt);background:#f0ecdd1f;pointer-events:none}
@@ -191,6 +200,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
 <symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H11l-4.5 4v-4H4z"/><path d="M8.5 10.5h7"/></symbol>
 <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="camera" viewBox="0 0 24 24"><path d="M4 8h3.5l1.5-2.5h6L16.5 8H20v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
 <symbol id="send" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
 <symbol id="alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></symbol>
 <symbol id="move" viewBox="0 0 24 24"><path d="M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4"/></symbol>
@@ -213,7 +223,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <section id="app" hidden>
   <nav id="nav"></nav>
   <main>
-    <div class="cin"><b>&gt;</b><textarea id="txt" rows="2" aria-label="Nova nota" placeholder="Despeje tudo aqui, solto, misturado…"></textarea><button id="guardar">Guardar<small>Ctrl+Enter</small></button></div>
+    <div class="cin"><b>&gt;</b><div id="anexo" hidden><img alt="Foto anexada"><button aria-label="Tirar a foto" title="Tirar a foto">✕</button></div><textarea id="txt" rows="2" aria-label="Nova nota" placeholder="Despeje tudo aqui, solto, misturado…"></textarea><label id="foto" title="Foto ou print de uma lista (ou Ctrl+V de um print): cada linha vira item"><svg class="i"><use href="#camera"/></svg><input type="file" accept="image/*" aria-label="Enviar foto de lista"></label><button id="guardar">Guardar<small>Ctrl+Enter</small></button></div>
     <div id="st" class="fila"></div>
     <div id="vista"></div>
   </main>

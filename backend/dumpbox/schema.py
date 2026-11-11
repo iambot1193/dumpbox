@@ -24,6 +24,7 @@ class Item(ItemIA):
     """Item final: ItemIA + campos derivados por regra."""
     prazo_em: str | None = None  # ISO 'YYYY-MM-DD' ou 'YYYY-MM-DDTHH:MM'
     prioridade: Literal["alta", "media", "baixa"] = "baixa"
+    estado: Literal["catalogado", "feito"] = "catalogado"  # "feito": linha marcada numa foto de checklist
 
 
 if __name__ == "__main__":  # python -m dumpbox.schema > schema/saida_ia.schema.json

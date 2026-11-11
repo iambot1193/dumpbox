@@ -173,8 +173,10 @@ def _valida_na_linha(c, a: chat.Acao, linha: str, agora: datetime) -> chat.Acao:
     return ok
 
 
-def interpretar(c, captura_id: str, texto: str, agora: datetime, modelo: str) -> Resultado:
-    """Aplica as linhas de instrução (reversível) e devolve os itens NOVOS das demais linhas, via classificador."""
+def interpretar(c, captura_id: str, texto: str, agora: datetime, modelo: str, base: datetime | None = None) -> Resultado:
+    """Aplica as linhas de instrução (reversível) e devolve os itens NOVOS das demais linhas, via classificador.
+    `base`: quando o texto foi escrito; datas das instruções ("adia pra amanhã") contam a partir dela."""
+    agora_txt, agora = agora, base or agora  # ações resolvem prazo pela hora da escrita
     t0 = time.perf_counter()
     linhas = [l for l in texto.split("\n") if l.strip()]
     instrucoes = [l for l in linhas if parece_comando(l)]
@@ -212,7 +214,7 @@ def interpretar(c, captura_id: str, texto: str, agora: datetime, modelo: str) ->
         c.commit()
 
     if notas:  # o que não é instrução é anotação nova: classificador normal (nada se perde)
-        res = classificar("\n".join(notas), agora, modelo, exemplos=db.exemplos(c), pastas=db.pastas(c))
+        res = classificar("\n".join(notas), agora_txt, modelo, exemplos=db.exemplos(c), pastas=db.pastas(c), base=base)
         res.prompt_v = f"{PROMPT_V}+{res.prompt_v}"
     else:
         res = Resultado([], modelo, PROMPT_V, 0)

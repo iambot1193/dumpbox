@@ -27,7 +27,8 @@ Uma captura é o texto como foi digitado. O worker classifica em segundo plano e
 | Método e rota | Corpo | Resposta |
 |---|---|---|
 | 🔒 `GET /api/sessao` | | `{"ok": true}` se o cookie vale. |
-| 🔒 `POST /api/capturas` | `{"id": "uuid do cliente (8-64)", "texto": "1-5000"}` | `{"nova": bool}`. Idempotente pelo `id`: reenviar a mesma captura (fila offline) devolve `nova: false` e não duplica. |
+| 🔒 `POST /api/capturas` | `{"id": "uuid do cliente (8-64)", "texto": "1-5000", "criado_em"?: "hora local da escrita"}` | `{"nova": bool}`. `criado_em` faz "amanhã" contar de quando a nota foi escrita (fila offline); fora de um ano atrás até agora, vale a hora do PC. Idempotente pelo `id`: reenviar a mesma captura (fila offline) devolve `nova: false` e não duplica. |
+| 🔒 `POST /api/capturas/imagem` | `{"id", "imagem": "JPEG/PNG em base64 (≤4 MB)", "texto"?: "instruções (≤1000)", "criado_em"?}` | `{"nova": bool}`. Foto ou print de lista; `texto` orienta o classificador (tipo, pasta, prazo) e não vira item. O worker transcreve com o modelo de visão, a captura passa a ter o texto lido (`[x]` = marcado) e linhas que repetem um item aberto (≥60% das palavras nos dois sentidos) não viram item novo: marcadas fecham o item existente (diário, Desfazer), sem marca ficam como estão. As demais viram itens; marcadas entram como `feito`. A foto é apagada depois que vira itens. `422` se não for JPEG/PNG. |
 | 🔒 `POST /api/capturas/{id}/reprocessar` | | Volta uma captura `falhou` para a fila. `404` se não existe ou não falhou. |
 | 🔒 `POST /api/capturas/{id}/como-nota` | | Instrução que o editor não conseguiu aplicar: reprocessa tratando o texto como anotação comum. `404` como acima. |
 

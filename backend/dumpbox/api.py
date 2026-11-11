@@ -1,11 +1,12 @@
 """API + PWA. Rodar: uvicorn dumpbox.api:app --host 127.0.0.1 --port 8000 (expor só via Tailscale)."""
+import base64
 import os
 import sys
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -13,7 +14,7 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, chat, classifier, db, editor, ollama_mgr, rules, setup
+from . import auth, chat, classifier, db, editor, ollama_mgr, rules, setup, visao
 from .schema import Tipo
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
@@ -23,11 +24,18 @@ WEB = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "web
 def processar_pendentes(c) -> int:
     """Classifica capturas pendentes, uma por vez. Retorna quantas processou."""
     n = 0
-    for row in c.execute("SELECT id, texto, erro FROM captura WHERE status='pendente' ORDER BY criado_em").fetchall():
-        if row["erro"] != "forcar_nota" and editor.parece_comando(row["texto"]):  # instrução de edição: aplica (reversível) + cria só o que for novo
-            r = editor.interpretar(c, row["id"], row["texto"], datetime.now(), ollama_mgr.modelo())
+    for row in c.execute("SELECT id, texto, erro, criado_em, origem FROM captura WHERE status='pendente' ORDER BY criado_em").fetchall():
+        base = datetime.fromisoformat(row["criado_em"])  # hora em que foi escrita: nota que esperou na fila não ganha prazo adiado
+        img = c.execute("SELECT dados, instrucao FROM imagem WHERE captura_id=?", (row["id"],)).fetchone() if row["origem"] == "imagem" else None
+        if img:  # foto: o modelo de visão transcreve, o classificador de texto cataloga
+            texto, r = visao.processar(img["dados"], datetime.now(), base, ollama_mgr.modelo(), img["instrucao"] or "",
+                                       c=c, captura_id=row["id"], exemplos=db.exemplos(c), pastas=db.pastas(c))
+            if texto:  # o que aparece em Revisar: instrução + o que a IA leu
+                c.execute("UPDATE captura SET texto=? WHERE id=?", ((img["instrucao"] + "\n" if img["instrucao"] else "") + texto, row["id"]))
+        elif row["erro"] != "forcar_nota" and editor.parece_comando(row["texto"]):  # instrução de edição: aplica (reversível) + cria só o que for novo
+            r = editor.interpretar(c, row["id"], row["texto"], datetime.now(), ollama_mgr.modelo(), base=base)
         else:
-            r = classifier.classificar(row["texto"], datetime.now(), ollama_mgr.modelo(), exemplos=db.exemplos(c), pastas=db.pastas(c))
+            r = classifier.classificar(row["texto"], datetime.now(), ollama_mgr.modelo(), exemplos=db.exemplos(c), pastas=db.pastas(c), base=base)
         db.salvar_resultado(c, row["id"], r)
         n += 1
     return n
@@ -77,6 +85,14 @@ class Login(BaseModel):
 class NovaCaptura(BaseModel):
     id: str = Field(min_length=8, max_length=64)  # UUID gerado no cliente → idempotência
     texto: str = Field(min_length=1, max_length=5000)
+    criado_em: datetime | None = None  # hora local em que foi escrita (fila offline); datas contam a partir dela
+
+
+class NovaImagem(BaseModel):
+    id: str = Field(min_length=8, max_length=64)
+    imagem: str = Field(min_length=100, max_length=4_000_000)  # JPEG/PNG em base64, já reduzido no navegador
+    texto: str = Field(default="", max_length=1000)  # instruções escritas junto com a foto
+    criado_em: datetime | None = None
 
 
 class Edicao(BaseModel):
@@ -166,7 +182,34 @@ def sessao():
 
 @app.post("/api/capturas", dependencies=[Depends(exige_login)])
 def criar_captura(body: NovaCaptura, c=Depends(conexao)):
-    return {"nova": db.nova_captura(c, body.id, body.texto.strip())}
+    return {"nova": db.nova_captura(c, body.id, body.texto.strip(), criado_em=_quando(body.criado_em))}
+
+
+def _quando(criado_em: datetime | None) -> str | None:
+    """Hora da escrita mandada pelo aparelho; relógio fora do razoável: usa a hora do PC (None)."""
+    agora = datetime.now()
+    quando = criado_em.replace(tzinfo=None) if criado_em else None
+    if quando and agora - timedelta(days=365) <= quando <= agora + timedelta(minutes=5):
+        return quando.isoformat(timespec="seconds")
+    return None
+
+
+@app.post("/api/capturas/imagem", dependencies=[Depends(exige_login)])
+def criar_captura_imagem(body: NovaImagem, c=Depends(conexao)):
+    """Foto de lista/checklist: entra na fila como captura; o worker transcreve e cataloga."""
+    try:
+        cabeca = base64.b64decode(body.imagem[:24], validate=True)
+    except ValueError:
+        raise HTTPException(422, "imagem inválida")
+    if not cabeca.startswith((bytes([0xFF, 0xD8]), bytes([0x89]) + b"PNG")):  # JPEG ou PNG
+        raise HTTPException(422, "envie JPEG ou PNG")
+    quando = _quando(body.criado_em)
+    instrucao = body.texto.strip()
+    nova = db.nova_captura(c, body.id, "📷 foto aguardando a IA" + (f": {instrucao}" if instrucao else ""), "imagem", criado_em=quando)
+    if nova:
+        c.execute("INSERT INTO imagem(captura_id, dados, instrucao) VALUES(?,?,?)", (body.id, body.imagem, instrucao or None))
+        c.commit()
+    return {"nova": nova}
 
 
 @app.get("/api/itens", dependencies=[Depends(exige_login)])

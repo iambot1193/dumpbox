@@ -94,7 +94,7 @@ def _subir(exe: str) -> None:
     raise RuntimeError("O Ollama não respondeu em 60 s.")
 
 
-def _garantir_modelo(nome: str) -> None:
+def _garantir_modelo(nome: str, progresso: bool = True) -> None:
     tags = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=10).json().get("models", [])
     if any(m["name"] == nome or m["name"].startswith(nome + ":") for m in tags):
         return
@@ -106,7 +106,7 @@ def _garantir_modelo(nome: str) -> None:
             d = json.loads(linha)
             if d.get("error"):
                 raise RuntimeError(d["error"])
-            if d.get("total"):
+            if progresso and d.get("total"):
                 _set("baixando_modelo", int(100 * d.get("completed", 0) / d["total"]), f"Baixando o modelo {nome}")
 
 
@@ -122,6 +122,8 @@ def preparar() -> None:
         _garantir_modelo(ESTADO["modelo"])
         _set("pronto", 100, "Pronto")
         ESTADO["pronto"] = True
+        from .visao import MODELO as VISAO
+        _garantir_modelo(VISAO, progresso=False)  # depois do texto e sem barra: só fotos esperam por ele
     except Exception as e:  # mostra na UI em vez de morrer calado
         ESTADO["erro"] = str(e)[:300]
 

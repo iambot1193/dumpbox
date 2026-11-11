@@ -34,6 +34,7 @@ PWA (fila em localStorage, UUID)
 |---|---|
 | `api.py` | rotas, login, worker em segundo plano |
 | `classifier.py` | prompt, chamada ao Ollama com `format` = JSON Schema, versões de prompt (`DUMPBOX_PROMPT`) |
+| `visao.py` | foto de lista: modelo de visão transcreve (`item => marcada/vazia`), classificador cataloga |
 | `editor.py` | detecta instruções (regex + fuzzy), uma chamada por instrução, reorganização em massa |
 | `chat.py` | ações validadas (`validar`/`aplicar`), diário `alteracao`, `desfazer`, chat |
 | `rules.py` | datas em pt-BR e prioridade, sem IA |
@@ -59,6 +60,7 @@ Lidas do ambiente ou de `config.env` (o ambiente tem prioridade). Modelo em [`.e
 | `DUMPBOX_COOKIE_SECURE` | `0` | `1` quando servir por HTTPS |
 | `DUMPBOX_MODEL` | pela RAM | força o modelo do Ollama |
 | `DUMPBOX_PROMPT` | `v2` | versão do prompt do classificador |
+| `DUMPBOX_MODELO_VISAO` | `qwen2.5vl:3b` | modelo de visão (foto de lista); o exe baixa depois do de texto |
 | `DUMPBOX_WORKER` | `1` | `0` desliga o worker (testes) |
 | `DUMPBOX_AUTOPREPARO` | `1` no `run.py`/exe | baixa e sobe o Ollama sozinho |
 | `DUMPBOX_NO_BROWSER` | | `1` não abre o navegador |
@@ -79,6 +81,11 @@ python tests/ui_browser.py                    # tela real no Chrome headless, PC
 ```bash
 python eval/run_eval.py qwen2.5:7b                                # 46 casos sintéticos em data/public/casos.jsonl
 python eval/run_eval.py qwen2.5:7b data/private/casos.jsonl       # suas notas reais (fora do git)
+```
+
+```bash
+python eval/gera_imagens.py                                       # 24 checklists sintéticos + gabarito
+python eval/run_eval_visao.py qwen2.5vl:3b -v                     # itens achados, marcado certo por estilo
 ```
 
 Mede JSON válido, nº de itens, tipo, contexto, prazo e latência p50. Ao mudar o prompt, crie uma versão nova em `classifier.py`, rode o eval com `DUMPBOX_PROMPT` e atualize a tabela do README.

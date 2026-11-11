@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS alteracao(  -- diário de edições automáticas: bas
   desfeito INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS pasta(  -- pastas = contexto do item; o usuário cria e apaga
   slug TEXT PRIMARY KEY, nome TEXT NOT NULL, descricao TEXT NOT NULL DEFAULT '', ordem INTEGER NOT NULL, criado_em TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS imagem(  -- foto esperando a IA; apagada depois que vira itens
+  captura_id TEXT PRIMARY KEY REFERENCES captura(id), dados TEXT NOT NULL, instrucao TEXT);
 """
 PADRAO = [  # descrição vai para o prompt: diz à IA o que entra em cada pasta
     ("casa", "Casa", "dia a dia, pessoal, coisas de casa"),
@@ -56,6 +58,9 @@ def conectar() -> sqlite3.Connection:
         if "grade_col" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # posição/tamanho do card na pasta
             for col in ("grade_col", "grade_lin", "grade_larg", "grade_alt"):
                 c.execute(f"ALTER TABLE item ADD COLUMN {col} INTEGER")
+            c.commit()
+        if "instrucao" not in {r["name"] for r in c.execute("PRAGMA table_info(imagem)")}:  # texto escrito junto com a foto
+            c.execute("ALTER TABLE imagem ADD COLUMN instrucao TEXT")
             c.commit()
         if not c.execute("SELECT 1 FROM pasta LIMIT 1").fetchone():
             c.executemany("INSERT INTO pasta(slug,nome,descricao,ordem,criado_em) VALUES(?,?,?,?,?)",
@@ -116,9 +121,10 @@ def agora() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
-def nova_captura(c: sqlite3.Connection, id_: str, texto: str, origem: str = "web") -> bool:
-    """Idempotente: mesmo id (UUID gerado no cliente) não duplica. True se era nova."""
-    cur = c.execute("INSERT OR IGNORE INTO captura(id,texto,origem,criado_em) VALUES(?,?,?,?)", (id_, texto, origem, agora()))
+def nova_captura(c: sqlite3.Connection, id_: str, texto: str, origem: str = "web", criado_em: str | None = None) -> bool:
+    """Idempotente: mesmo id (UUID gerado no cliente) não duplica. True se era nova.
+    `criado_em`: hora em que o cliente escreveu (fila offline); padrão = agora."""
+    cur = c.execute("INSERT OR IGNORE INTO captura(id,texto,origem,criado_em) VALUES(?,?,?,?)", (id_, texto, origem, criado_em or agora()))
     c.commit()
     return cur.rowcount == 1
 
@@ -177,9 +183,10 @@ def salvar_resultado(c: sqlite3.Connection, captura_id: str, r) -> None:
                 continue
             abertos.add(normalizar(i.titulo))
             c.execute(
-                "INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,estado,criado_em) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (captura_id, i.tipo, i.titulo, i.contexto, i.prazo_texto, i.prazo_em, i.prioridade,
-                 json.dumps(i.tags, ensure_ascii=False), agora()),
+                 json.dumps(i.tags, ensure_ascii=False), i.estado, agora()),
             )
         c.execute("UPDATE captura SET status='ok', erro=NULL WHERE id=?", (captura_id,))
+        c.execute("DELETE FROM imagem WHERE captura_id=?", (captura_id,))  # já virou itens: não guarda a foto
     c.commit()

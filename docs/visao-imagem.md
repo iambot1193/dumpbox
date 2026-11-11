@@ -1,4 +1,6 @@
-# Entrada por imagem (ideia, ainda não implementada)
+# Entrada por imagem
+
+> **Feito (11/11/2026): fluxo A** em `backend/dumpbox/visao.py` (`POST /api/capturas/imagem`, botão de câmera na PWA), modelo `qwen2.5vl:3b`, avaliação em `eval/run_eval_visao.py` (resultados no README). Diferente do plano abaixo: o modelo devolve texto `item => marcada/vazia`, não JSON (com schema o 3B devolvia lista vazia), e item marcado entra como `feito` direto (reversível com Reabrir); só a lista inteira marcada é tratada como erro do modelo. Fluxo B continua ideia.
 
 Pedido: subir uma imagem e dizer "classifique quais já foram feitos, de acordo com os itens do checklist".
 

@@ -501,8 +501,82 @@ def test_rate_limit_e_token():
     assert not auth.limite_ok("9.9.9.9")
 
 
+def test_nota_offline_usa_hora_da_escrita():
+    """Nota escrita offline e enviada dias depois: "amanhã" conta da hora da escrita, não do processamento."""
+    from datetime import timedelta
+    vistos = {}
+    classifier.classificar = lambda texto, agora, modelo="fake", base=None, **k: (
+        vistos.__setitem__(texto, base), classifier.Resultado([], modelo, "t", 1))[1]
+    c = TestClient(api.app)
+    assert c.post("/api/login", json={"senha": "senha-certa"}).status_code == 200
+    antes = (datetime.now() - timedelta(days=2)).replace(microsecond=0)
+    futuro = datetime.now() + timedelta(days=3)
+    c.post("/api/capturas", json={"id": "offline-01", "texto": "luz amanhã", "criado_em": antes.isoformat()})
+    c.post("/api/capturas", json={"id": "offline-02", "texto": "relógio errado", "criado_em": futuro.isoformat()})
+    api.processar_pendentes(db.conectar())
+    classifier.classificar = CLASSIFICAR
+    assert vistos["luz amanhã"] == antes
+    assert abs((vistos["relógio errado"] - datetime.now()).total_seconds()) < 60  # fora da faixa: hora do PC
+    it = classifier.finalizar([classifier.SaidaIA.model_validate({"itens": [{"tipo": "tarefa", "titulo": "Luz", "contexto": "casa", "prazo_texto": "amanhã"}]}).itens[0]],
+                              datetime.now(), antes)
+    assert it[0].prazo_em == (antes + timedelta(days=1)).date().isoformat()
+
+
+def test_prazo_por_regra_corrige_o_modelo():
+    ia = lambda **k: classifier.SaidaIA.model_validate({"itens": [{"titulo": "x", "contexto": "casa", **k}]}).itens
+    seg = datetime(2026, 11, 10, 9)
+    # modelo cortou "dia 4" em "4 às 19h": com um item só, a regra lê a nota inteira
+    assert classifier.finalizar(ia(tipo="compromisso", prazo_texto="4 às 19h"), seg, texto="apresentação do tcc dia 4 às 19h")[0].prazo_em == "2026-12-04T19:00"
+    assert classifier.finalizar(ia(tipo="tarefa"), seg, texto="fazer exercícios de inglês hoje")[0].prazo_em == "2026-11-10"
+    # nota é informação: data no texto não vira prazo
+    assert classifier.finalizar(ia(tipo="nota", prazo_texto="dia 22"), seg, texto="nota: as férias começam dia 22")[0].prazo_em is None
+
+
+def test_foto_de_lista():
+    """Foto: entra na fila, visão transcreve, marcadas viram itens feitos; a foto não fica guardada."""
+    import base64
+    from dumpbox import visao
+    jpeg = base64.b64encode(bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"0" * 200).decode()
+    c = TestClient(api.app)
+    assert c.post("/api/login", json={"senha": "senha-certa"}).status_code == 200
+    assert c.post("/api/capturas/imagem", json={"id": "foto-0001", "imagem": base64.b64encode(b"GIF89a" + b"0" * 200).decode()}).status_code == 422
+    assert c.post("/api/capturas/imagem", json={"id": "foto-0001", "imagem": jpeg, "texto": "tudo da casa"}).json()["nova"] is True
+    assert c.post("/api/capturas/imagem", json={"id": "foto-0001", "imagem": jpeg}).json()["nova"] is False  # idempotente
+    transcrever, classificar = visao.transcrever, visao.classificar
+    visao.transcrever = lambda img: [visao.Linha(texto="Comprar tinta", marcado=False), visao.Linha(texto="Lixar parede", marcado=True)]
+    instrucoes = []
+    visao.classificar = lambda texto, agora, modelo, instrucao="", **k: (instrucoes.append(instrucao), classifier.Resultado(
+        [Item(tipo="tarefa", titulo=texto, contexto="casa")], modelo, "t", 1))[1]
+    try:
+        conn = db.conectar()
+        api.processar_pendentes(conn)
+    finally:
+        visao.transcrever, visao.classificar = transcrever, classificar
+    itens = {r["titulo"]: r["estado"] for r in conn.execute("SELECT i.titulo, i.estado FROM item i WHERE captura_id='foto-0001'")}
+    assert itens == {"Comprar tinta": "catalogado", "Lixar parede": "feito"}
+    assert conn.execute("SELECT texto FROM captura WHERE id='foto-0001'").fetchone()[0] == "tudo da casa\nComprar tinta\n[x] Lixar parede"
+    assert instrucoes == ["tudo da casa", "tudo da casa"]  # instrução escrita com a foto chega ao classificador
+    assert not conn.execute("SELECT 1 FROM imagem").fetchone()  # foto apagada depois de virar itens
+
+    # print de lista que já existe: marcada fecha o item existente, sem marca não mexe, nada é duplicado
+    assert c.post("/api/capturas/imagem", json={"id": "foto-0002", "imagem": jpeg}).json()["nova"] is True
+    visao.transcrever = lambda img: [visao.Linha(texto="comprar tinta", marcado=True), visao.Linha(texto="Pintar o portão", marcado=False)]
+    visao.classificar = lambda texto, agora, modelo, **k: classifier.Resultado([Item(tipo="tarefa", titulo=texto, contexto="casa")], modelo, "t", 1)
+    try:
+        api.processar_pendentes(conn)
+    finally:
+        visao.transcrever, visao.classificar = transcrever, classificar
+    assert [r[0] for r in conn.execute("SELECT estado FROM item WHERE titulo='Comprar tinta'")] == ["feito"]
+    assert [r[0] for r in conn.execute("SELECT titulo FROM item WHERE captura_id='foto-0002'")] == ["Pintar o portão"]
+    grupo = conn.execute("SELECT grupo FROM alteracao WHERE captura_id='foto-0002'").fetchone()[0]
+    assert c.post("/api/desfazer", json={"grupo": grupo}).json()["revertidas"] == 1  # fechar pela foto tem Desfazer
+
+
 if __name__ == "__main__":
     test_fluxo()
+    test_foto_de_lista()
+    test_nota_offline_usa_hora_da_escrita()
+    test_prazo_por_regra_corrige_o_modelo()
     test_pastas_grade_lixeira()
     test_chat()
     test_editor_aplica_instrucoes_e_desfaz()

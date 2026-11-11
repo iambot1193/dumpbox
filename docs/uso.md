@@ -26,6 +26,15 @@ A IA separa em itens, escolhe tipo (tarefa, compromisso, ideia, compra, nota) e 
 - **Repetido:** se já existe um item aberto com o mesmo título, outro não é criado.
 - **Colagem do WhatsApp:** cole as mensagens como estão. O cabeçalho `[hora, data] Nome:` é removido e "amanhã" conta a partir da data da mensagem.
 
+## Foto de uma lista
+
+O botão de câmera ao lado de **Guardar** anexa uma foto ou print de lista ou checklist; no PC, dá para colar um print com **Ctrl+V** (ex.: depois de Win+Shift+S). A miniatura aparece na caixa e nada é enviado ainda: escreva instruções se quiser ("tudo do trabalho, pra sexta") e aperte Guardar. A IA lê cada linha e cria os itens: o que tem a caixa marcada (✓ ou X) já entra como feito. Leva uns 10 a 30 segundos no PC.
+
+- Linha que já é um item seu não vira item novo: se está marcada na foto, o item é marcado como feito (com Desfazer); sem marca, fica como está. Serve para dar baixa mandando o print da lista.
+- Funciona melhor com print ou foto reta e com boa luz. Texto riscado às vezes passa como não feito.
+- A foto é reduzida no celular, e o PC apaga a foto depois de criar os itens. Fica só o texto lido.
+- Sem conexão, a foto espera na fila como as notas.
+
 ## Dar instruções pela caixa de notas
 
 Linhas que são instrução mexem nos itens existentes em vez de criar novos. Podem vir misturadas com anotações:

@@ -45,12 +45,18 @@ class Resultado:
     erro: str | None = None
 
 
-def finalizar(itens_ia, agora: datetime, base: datetime | None = None) -> list[Item]:
+def finalizar(itens_ia, agora: datetime, base: datetime | None = None, texto: str | None = None) -> list[Item]:
     """ItemIA (saída do modelo) -> Item: data e prioridade por regra, nunca pela IA.
-    `base` = quando o texto foi escrito ("amanhã" numa mensagem antiga conta a partir dela)."""
+    `base` = quando o texto foi escrito ("amanhã" numa mensagem antiga conta a partir dela).
+    `texto` = nota original: com um item só, se o trecho do modelo não vira data (ele corta "dia 4" em "4"
+    ou esquece "hoje"), a regra lê a nota inteira. Nota (tipo) é informação: nunca tem prazo."""
     itens = []
     for i in itens_ia:
         prazo = resolver_prazo(i.prazo_texto, base or agora)
+        if prazo is None and texto and len(itens_ia) == 1:
+            prazo = resolver_prazo(texto, base or agora)
+        if i.tipo == "nota":  # "nota: as férias começam dia 22" não é tarefa com prazo
+            prazo = None
         itens.append(Item(**i.model_dump(), prazo_em=prazo, prioridade=prioridade(prazo, i.titulo, agora)))
     return itens
 
@@ -77,16 +83,18 @@ def blocos_zap(texto: str) -> list[tuple[datetime | None, str]]:
 
 
 def classificar(texto: str, agora: datetime, modelo: str = "qwen2.5:1.5b", tentativas: int = 2,
-                exemplos: str = "", pastas: list[dict] | None = None) -> Resultado:
-    """`pastas`: as do usuário ({slug, nome, descricao}); sem elas, as padrão (benchmark)."""
+                exemplos: str = "", pastas: list[dict] | None = None, base: datetime | None = None,
+                instrucao: str = "") -> Resultado:
+    """`pastas`: as do usuário ({slug, nome, descricao}); sem elas, as padrão (benchmark).
+    `base`: quando o texto foi escrito (nota feita offline); "amanhã" conta a partir dela."""
     blocos = blocos_zap(texto)
     if blocos[0][0] is None and len(blocos) == 1:
-        return _classificar(texto, agora, None, modelo, tentativas, exemplos, pastas)
+        return _classificar(texto, agora, base, modelo, tentativas, exemplos, pastas, instrucao)
     t0, itens = time.perf_counter(), []
-    for base, parte in blocos:
+    for quando, parte in blocos:
         if not parte.strip():
             continue
-        r = _classificar(parte, agora, base, modelo, tentativas, exemplos, pastas)
+        r = _classificar(parte, agora, quando or base, modelo, tentativas, exemplos, pastas, instrucao)
         if r.itens is None:  # uma mensagem falhou: a colagem inteira vai para Revisar (nada se perde)
             r.latencia_ms = int((time.perf_counter() - t0) * 1000)
             return r
@@ -102,10 +110,12 @@ def schema_com_pastas(slugs: list[str]) -> dict:
 
 
 def _classificar(texto: str, agora: datetime, base: datetime | None, modelo: str, tentativas: int, exemplos: str,
-                 pastas: list[dict] | None) -> Resultado:
+                 pastas: list[dict] | None, instrucao: str = "") -> Resultado:
     t0, erro = time.perf_counter(), None
     slugs = [p["slug"] for p in pastas] if pastas else list(get_args(Contexto))
     sistema = SISTEMA + (f"\n{exemplos}" if exemplos else "")
+    if instrucao:  # texto escrito junto com a foto: orienta tipo/pasta/prazo, não vira item
+        sistema += f"\nO usuário escreveu isto sobre a lista abaixo; siga para tipo, pasta e prazo, sem criar item para ela: {instrucao}"
     if pastas:
         sistema += "\nPastas do usuário (contexto); use SÓ estes slugs:\n" + "\n".join(
             f"- {p['slug']}: {p['nome']}" + (f" ({p['descricao']})" if p.get("descricao") else "") for p in pastas)
@@ -130,7 +140,7 @@ def _classificar(texto: str, agora: datetime, base: datetime | None, modelo: str
             for i in saida.itens:  # fora do enum (modelo sem suporte a schema): cai em "outro"
                 if i.contexto not in slugs:
                     i.contexto = "outro" if "outro" in slugs else slugs[0]
-            return Resultado(finalizar(saida.itens, agora, base), modelo, PROMPT_V, int((time.perf_counter() - t0) * 1000))
+            return Resultado(finalizar(saida.itens, agora, base, texto), modelo, PROMPT_V, int((time.perf_counter() - t0) * 1000))
         except (httpx.HTTPError, ValidationError, KeyError, ValueError) as e:
             erro = f"{type(e).__name__}: {e}"[:200]
     # nunca perder a nota: quem chamar manda o texto cru pra "revisar"

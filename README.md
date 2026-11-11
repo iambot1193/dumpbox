@@ -1,14 +1,41 @@
 # dumpbox
 
-Despeje texto solto, a IA cataloga. Notas viram itens com tipo, pasta, prazo e criticidade. Roda 100% local (Ollama no PC), sem nuvem.
+Despeje texto solto (ou o print de uma lista), a IA cataloga. Notas viram itens com tipo, pasta, prazo e criticidade. Roda 100% local (Ollama no PC), sem nuvem.
 
-> Status: classificador + avaliação, **API + PWA com login**, editor inteligente, tela de pastas e **foto de lista virando itens** prontos. Falta: modo demo (app no celular sem o PC), bot Telegram.
+![Tela do dumpbox: Hoje, foto de lista anexada, pastas com grade livre, arraste, seleção e assistente](docs/img/demo.gif)
+
+> Status: classificador com avaliação (150 casos), **API + PWA com login**, editor inteligente, pastas com grade livre e **foto de lista virando itens** prontos. Próximos: app no celular sem depender do PC (modo demo clicável), bot de lembretes no Telegram. Dados das imagens: sintéticos.
+
+**Destaques técnicos**
+- **LLM local com saída validada:** JSON Schema gerado do Pydantic a cada chamada (enum com as pastas que existem agora), retry e nota que nunca se perde.
+- **A IA não calcula datas:** o modelo copia o trecho ("sexta 14h") e um parser determinístico em pt-BR resolve; prazo 99% no benchmark.
+- **Ações da IA reversíveis:** conjunto fechado, validadas no servidor, item precisa ser citado, tudo num diário com Desfazer; texto de nota tratado como não confiável (prompt injection).
+- **Visão:** print de checklist → `qwen2.5vl:3b` lê linhas e marcas → o que já existe é fechado, o resto vira item. Avaliado em checklists gerados por script.
+- **Avaliação reproduzível:** harness de texto e de visão com dataset público sintético; decisões de prompt medidas (tabelas abaixo).
+- **Exe para PC sem nada instalado:** baixa Ollama portátil e o modelo certo pela RAM; CI gera o exe em tags.
 
 ## Como funciona
 
+```mermaid
+flowchart LR
+  subgraph Navegador["PWA (PC ou celular)"]
+    UI[Tela] --> Fila[(fila offline<br/>localStorage)]
+  end
+  Fila -- "POST /api/capturas<br/>(UUID, idempotente)" --> API[FastAPI]
+  API --> DB[(SQLite WAL)]
+  DB --> W[worker]
+  W -- "texto" --> CL[classificador<br/>qwen2.5:7b + JSON Schema]
+  W -- "instrução" --> ED[editor<br/>ações validadas + diário]
+  W -- "foto" --> VI[visão<br/>qwen2.5vl:3b]
+  VI --> CL
+  CL --> R[rules.py<br/>datas e prioridade]
+  R --> DB
+  ED --> DB
 ```
-PWA no celular/PC (fila offline) --rede local/VPN--> FastAPI no PC --> worker + Ollama --> SQLite
-```
+
+| Hoje e pastas | Assistente com Desfazer | Celular |
+|---|---|---|
+| ![Vista Hoje](docs/img/hoje.png) | ![Assistente aplicando mudança](docs/img/ia.png) | ![Tela no celular](docs/img/celular.png) |
 
 - **Tudo roda no seu PC** (Ollama + FastAPI + SQLite). O celular só abre a PWA, com login próprio.
 - **Offline-first no navegador:** notas ficam numa fila local com UUID e são enviadas quando o servidor volta (idempotente).
@@ -28,13 +55,14 @@ PWA no celular/PC (fila offline) --rede local/VPN--> FastAPI no PC --> worker + 
 - **Grade livre** dentro da pasta: solte o card em qualquer célula e aumente pelo canto, com prévia do tamanho; nada se sobrepõe.
 - **Criticidade** em 4 níveis (crítica, alta, média, baixa) e filtro por nível. A regra sugere pelo prazo; o que você marca à mão não é recalculado.
 - **Seleção múltipla:** clique, Ctrl+clique, Shift+clique, laço arrastando no vazio, Ctrl+A; ações em lote com um Desfazer. No celular, botão "Selecionar".
+- **Foto ou print de lista** (botão de câmera ou Ctrl+V): fica anexada como miniatura para você escrever instruções; linhas marcadas fecham itens que já existem, o resto vira item.
 - **+ Nova** cria tarefa à mão, sem IA. **Janela flutuante da IA** para perguntar e pedir mudanças (aplica na hora, com Desfazer; nunca apaga de vez).
 
 Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a escolhida foi a B2).
 
 ## Usar (Windows, sem instalar nada)
 
-1. Baixe o `dumpbox.exe` em [Releases](../../releases) e dê duplo clique.
+1. Baixe o `dumpbox.exe` em [Releases](../../releases) e dê duplo clique (a primeira release sai na versão 1.0; até lá, use a instalação para desenvolvedores abaixo).
 2. Se o Windows mostrar "O Windows protegeu seu PC" (o exe não é assinado): **Mais informações → Executar assim mesmo**.
 3. O navegador abre sozinho. Crie uma senha e pronto.
 4. Na **primeira vez** o app baixa o motor de IA (Ollama) e o modelo, com barra de progresso na tela. Precisa de ~10 GB livres e internet. Enquanto isso você já pode guardar notas; elas são classificadas quando a IA ficar pronta.
@@ -127,4 +155,8 @@ docs/              arquitetura, decisões e mockups
 
 ## Privacidade
 
-Repo público: nenhuma nota real. `data/private/`, `.env` e modelos `.gguf` ficam no `.gitignore`; testes e mockups usam dados inventados. Pesos dos modelos têm licença própria (ex.: Qwen2.5-1.5B é Apache 2.0); não são redistribuídos aqui. A fonte Barlow vai junto em `web/fonts/` sob a SIL Open Font License.
+Repo público: nenhuma nota real. `data/private/`, `.env` e modelos `.gguf` ficam no `.gitignore`; testes e mockups usam dados inventados. Pesos dos modelos têm licença própria (ex.: Qwen2.5-1.5B é Apache 2.0; Qwen2.5-VL-3B usa a Qwen Research License); não são redistribuídos aqui. A fonte Barlow vai junto em `web/fonts/` sob a SIL Open Font License.
+
+## Licença
+
+[MIT](LICENSE).

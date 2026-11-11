@@ -465,6 +465,7 @@ def test_primeiro_uso_e_modelo():
     setup.ARQ = Path(tempfile.mkdtemp()) / "c.env"
     c = TestClient(api.app)
     assert c.get("/api/estado").json()["configurado"] is False
+    assert c.get("/api/estado").json()["preparo"]["pronto"] is True  # sem preparo automático: Ollama é do usuário, não mostra barra
     assert c.post("/api/setup", json={"senha": "12345678"}).status_code == 403  # host 'testclient' não é local
     api._e_local = lambda r: True
     assert c.post("/api/setup", json={"senha": "curta"}).status_code == 422

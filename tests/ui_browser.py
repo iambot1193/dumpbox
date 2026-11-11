@@ -4,6 +4,7 @@ Não toca no banco do usuário. Fora do pytest: precisa de `pip install playwrig
     python tests/ui_browser.py [pasta_das_capturas]
 
 Sai com código 1 se alguma verificação falhar. Caminho extra para o pacote: DUMPBOX_PW_PATH."""
+import base64
 import json
 import os
 import subprocess
@@ -91,17 +92,17 @@ try:
         g.screenshot(path=SAIDA / "1-hoje.png")
 
         # Ctrl+V de um print (Win+Shift+S): vira captura de imagem na fila
-        g.evaluate("""async () => {
-          const c = document.createElement('canvas'); c.width = 40; c.height = 30;
-          const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        lista = base64.b64encode((RAIZ / "data" / "public" / "imagens" / "lista_01.png").read_bytes()).decode()  # checklist sintético
+        g.evaluate("""async b64 => {
+          const blob = await (await fetch('data:image/png;base64,' + b64)).blob();
           const dt = new DataTransfer(); dt.items.add(new File([blob], 'print.png', { type: 'image/png' }));
           document.getElementById('txt').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        }""")
+        }""", lista)
         g.wait_for_selector("#anexo:not([hidden]) img")
         foto_na_fila = "fetch('/api/itens').then(r => r.json()).then(d => d.revisar.some(c => c.texto.includes('foto')))"
         ok(not g.evaluate(foto_na_fila), "Ctrl+V só anexa a foto (miniatura), não envia sozinho")
         g.fill("#txt", "tudo do trabalho")
-        g.locator(".cin").screenshot(path=SAIDA / "1b-foto-anexada.png")
+        g.screenshot(path=SAIDA / "1b-foto-anexada.png")
         g.click("#guardar")
         g.wait_for_function(foto_na_fila.replace("includes('foto')", "includes('foto aguardando a IA: tudo do trabalho')"), timeout=5000)
         ok(g.locator("#anexo").is_hidden() and g.input_value("#txt") == "", "Guardar envia foto + instrução e limpa a caixa")

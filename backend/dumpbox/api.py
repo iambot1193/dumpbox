@@ -138,7 +138,7 @@ class NovaSenha(BaseModel):
 @app.get("/api/estado")
 def estado():
     """Público e sem dados sensíveis: a tela decide entre criar senha, login e app; mostra o progresso da IA."""
-    return {"configurado": bool(os.getenv("DUMPBOX_PASSWORD_HASH")), "preparo": ollama_mgr.ESTADO}
+    return {"configurado": bool(os.getenv("DUMPBOX_PASSWORD_HASH")), "preparo": {**ollama_mgr.ESTADO, "pronto": ollama_mgr.pronto()}}
 
 
 @app.post("/api/setup")

@@ -106,6 +106,9 @@ docs/              arquitetura, decisões e mockups
 
 ## Documentação
 
+- [`docs/uso.md`](docs/uso.md): guia de uso da tela (anotar, instruções, pastas, seleção, IA, celular)
+- [`docs/api.md`](docs/api.md): referência da API HTTP
+- [`docs/desenvolvimento.md`](docs/desenvolvimento.md): rodar, variáveis de ambiente, testes, eval, backup, release
 - [`docs/arquitetura.md`](docs/arquitetura.md): decisões atuais (PWA, exe, editor, tela, IA), modelo de dados, fases
 - [`docs/planejamento.md`](docs/planejamento.md): ideia, decisões, revisão crítica
 - [`docs/visao-imagem.md`](docs/visao-imagem.md): entrada por imagem (checklist)

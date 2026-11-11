@@ -6,7 +6,8 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 - Testes: `python tests/test_rules.py` e `PYTHONUTF8=1 python tests/test_api.py` (API sem Ollama). Tela: `python tests/ui_browser.py` (Playwright + Chrome; aqui o pacote está em `DUMPBOX_PW_PATH=D:\dev\_mockup_profile\pw`)
 - Pastas = tabela `pasta` (slug = `item.contexto`), cache `db.PASTAS`; nunca fixar a lista no código. Enum do JSON Schema montado por chamada.
 - Backup do banco real: API de backup do SQLite (cópia simples do .db perde o que está no -wal).
-- Senha (1x): `PYTHONPATH=backend python -m dumpbox.setup` → `data/private/config.env`. Servidor: `.\iniciar.ps1`
+- Banco REAL do usuário: `D:\dumpbox` (via `.\iniciar.ps1`, `DUMPBOX_HOME`), backup diário em `D:\dumpbox\backups`. Dev/testes: `data/private/` (`python run.py`). Nunca testar nem limpar dados no banco real sem pedir.
+- Senha (1x): pela tela no 1º acesso, ou `PYTHONPATH=backend python -m dumpbox.setup` → `<home>/config.env`.
 - Exe: `.\build.ps1` → `dist\dumpbox.exe` (PyInstaller; entrada `run.py` → `launcher.py`). 1º uso: tela cria senha (só do PC local) e `ollama_mgr.py` baixa Ollama portátil + modelo por RAM. Release automática: `.github/workflows/release.yml` (tag `v*`).
 - Cuidado: caminhos com `\\` passados por heredoc/python -c chegam colapsados; escreva texto com barras invertidas via Write/Edit.
 - Chat (`chat.py`): ações aplicadas na hora, só sobre item citado no pedido, sempre reversíveis (diário `alteracao`). Apagar de vez só pela Lixeira, nunca pela IA.

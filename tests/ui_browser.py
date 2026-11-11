@@ -270,6 +270,18 @@ try:
         ok(g.locator("#vista article.sel").count() == 4, "clique + Shift+clique marca o intervalo")
         h3(tit[1]).click(); h3(tit[1]).click()
         ok(g.locator("#vista article.sel").count() == 0, "clicar de novo no único marcado desmarca")
+        # pincel: Shift + segurar sobre um card e passar o mouse marca os cards por onde passou, sem mover nada
+        centro = lambda t: (lambda b: (b["x"] + b["width"] / 2, b["y"] + 20))(card(t).bounding_box())
+        pos_antes = {t: (item(t)["grade_col"], item(t)["grade_lin"]) for t in tit}
+        g.keyboard.down("Shift")
+        g.mouse.move(*centro(tit[0])); g.mouse.down()
+        for t in (tit[1], tit[3]):
+            g.mouse.move(*centro(t), steps=6)
+        g.mouse.up(); g.keyboard.up("Shift")
+        marcados = set(g.eval_on_selector_all("#vista article.sel h3", "a=>a.map(e=>e.textContent)"))
+        ok({tit[0], tit[1], tit[3]} <= marcados, f"Shift+arrastar marca os cards por onde passou ({len(marcados)})")
+        ok({t: (item(t)["grade_col"], item(t)["grade_lin"]) for t in tit} == pos_antes, "Shift+arrastar não move cards")
+        g.keyboard.press("Escape")
         # laço: segurar no espaço vazio e arrastar
         grade = g.locator(".grid").bounding_box()
         rs = g.eval_on_selector_all("#vista article.c", "a=>a.map(e=>{const r=e.getBoundingClientRect();return [r.left,r.top,r.right,r.bottom]})")

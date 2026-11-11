@@ -70,6 +70,21 @@ def conectar() -> sqlite3.Connection:
     return c
 
 
+def backup_diario(c: sqlite3.Connection, pasta: Path | None = None, manter: int = 14) -> Path | None:
+    """Uma cópia por dia em <pasta do banco>/backups (API de backup: inclui o que está no -wal). Guarda as últimas `manter`."""
+    pasta = pasta or DB_PATH.parent / "backups"
+    destino = pasta / f"dumpbox-{datetime.now():%Y-%m-%d}.db"
+    if destino.exists():
+        return None
+    pasta.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(destino) as d:
+        c.backup(d)
+    d.close()
+    for velho in sorted(pasta.glob("dumpbox-*.db"))[:-manter]:
+        velho.unlink()
+    return destino
+
+
 def pastas(c: sqlite3.Connection) -> list[dict]:
     rows = [dict(r) for r in c.execute("SELECT slug, nome, descricao FROM pasta ORDER BY ordem, criado_em")]
     PASTAS[:] = rows

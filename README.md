@@ -54,7 +54,7 @@ flowchart LR
 - **Pastas** na lateral (no celular, um trilho): crie e apague as suas; a IA passa a usar a pasta nova na hora. Mais **Hoje** (atrasados e prazos do dia de todas as pastas), **Revisar** e **Lixeira** (Restaurar / Apagar de vez com confirmação).
 - **Grade livre** dentro da pasta: solte o card em qualquer célula e aumente pelo canto, com prévia do tamanho; nada se sobrepõe.
 - **Criticidade** em 4 níveis (crítica, alta, média, baixa) e filtro por nível. A regra sugere pelo prazo; o que você marca à mão não é recalculado.
-- **Seleção múltipla:** clique, Ctrl+clique, Shift+clique, laço arrastando no vazio, Ctrl+A; ações em lote com um Desfazer. No celular, botão "Selecionar".
+- **Seleção múltipla:** clique, Ctrl+clique, Shift+clique, Shift+arrastar por cima dos cards, laço arrastando no vazio, Ctrl+A; ações em lote com um Desfazer. No celular, botão "Selecionar".
 - **Foto ou print de lista** (botão de câmera ou Ctrl+V): fica anexada como miniatura para você escrever instruções; linhas marcadas fecham itens que já existem, o resto vira item.
 - **+ Nova** cria tarefa à mão, sem IA. **Janela flutuante da IA** para perguntar e pedir mudanças (aplica na hora, com Desfazer; nunca apaga de vez).
 
@@ -82,7 +82,7 @@ python run.py          # sobe o servidor, abre o navegador e prepara Ollama + mo
 .\build.ps1            # gera dist\dumpbox.exe (Windows)
 ```
 
-No Windows, `iniciar.ps1` sobe o Ollama e o servidor juntos (ajuste `OLLAMA_EXE`/`OLLAMA_MODELS` se não for o caminho padrão).
+No Windows, `iniciar.ps1` sobe o Ollama e o servidor juntos com o banco de uso real em `DUMPBOX_HOME` (padrão `D:\dumpbox`; ajuste `OLLAMA_EXE`/`OLLAMA_MODELS` se não for o caminho padrão). `python run.py` e os testes usam `data/private/`.
 
 ### Acessar de outro aparelho (opcional)
 O projeto não depende de nenhum serviço de rede. Escolha o que preferir:

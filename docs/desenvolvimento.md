@@ -15,7 +15,7 @@ python run.py                                   # servidor + navegador + preparo
 python -m uvicorn dumpbox.api:app --app-dir backend --reload   # só o servidor, Ollama já rodando
 ```
 
-No Windows, `iniciar.ps1` sobe Ollama e servidor (ajuste `OLLAMA_EXE`/`OLLAMA_MODELS`).
+No Windows, `iniciar.ps1` sobe Ollama e servidor com o **banco de uso real** (`DUMPBOX_HOME`, padrão `D:\dumpbox`); `python run.py` usa `data/private/` (dev). Ajuste `OLLAMA_EXE`/`OLLAMA_MODELS` se preciso.
 
 Senha: crie pela tela no primeiro acesso, ou pelo terminal com `PYTHONPATH=backend python -m dumpbox.setup`. Fica só o hash em `data/private/config.env`.
 
@@ -101,7 +101,9 @@ Mede JSON válido, nº de itens, tipo, contexto, prazo e latência p50. Ao mudar
 
 ## Backup do banco
 
-O banco usa WAL; copiar só o `.db` perde o que está no `-wal`. Use a API de backup do SQLite:
+O worker faz um backup por dia em `<pasta do banco>/backups/dumpbox-AAAA-MM-DD.db` e guarda os 14 mais novos (`db.backup_diario`). Para restaurar, pare o servidor e copie um deles por cima de `dumpbox.db` (apague `-wal`/`-shm`).
+
+Backup manual: o banco usa WAL; copiar só o `.db` perde o que está no `-wal`. Use a API de backup do SQLite:
 
 ```bash
 python -c "import sqlite3; s=sqlite3.connect('data/private/dumpbox.db'); d=sqlite3.connect('backup.db'); s.backup(d)"

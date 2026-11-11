@@ -45,7 +45,7 @@ Limite: lista em várias linhas com o destino só na última tem as primeiras li
 - **Arrastar:** com o mouse, na hora; no toque, depois de segurar 300 ms (mexer antes disso é rolagem). "Mover para…" no card faz o mesmo sem arraste.
 - **Criticidade:** crítica, alta, média e baixa. A regra sugere de alta a baixa pelo prazo; só o usuário marca crítica, e a escolha manual não é recalculada.
 - **Feito, Excluir, Restaurar, Mover e criticidade** passam por `POST /api/itens/editar`, o mesmo validador das ações da IA, com diário e aviso com Desfazer.
-- **Seleção múltipla:** clique marca um card (como no Explorer), Ctrl+clique soma ou tira, Shift+clique marca o intervalo (na ordem da tela), segurar no espaço vazio e arrastar desenha um laço que marca os cards tocados (com Ctrl/Shift, soma), Ctrl+A marca todos, Esc limpa e Delete manda para a Lixeira. No celular, o botão "Selecionar" faz o toque marcar. A barra aplica Feito, Mover, Criticidade ou Excluir em todos (`POST /api/itens/editar` com `ids`: tudo ou nada, um Desfazer). Arrastar um card marcado leva a seleção inteira para a pasta.
+- **Seleção múltipla:** clique marca um card (como no Explorer), Ctrl+clique soma ou tira, Shift+clique marca o intervalo (na ordem da tela), Shift + segurar sobre um card e passar o mouse marca cada card por onde passa (pincel, sem mover nada), segurar no espaço vazio e arrastar desenha um laço que marca os cards tocados (com Ctrl/Shift, soma), Ctrl+A marca todos, Esc limpa e Delete manda para a Lixeira. No celular, o botão "Selecionar" faz o toque marcar. A barra aplica Feito, Mover, Criticidade ou Excluir em todos (`POST /api/itens/editar` com `ids`: tudo ou nada, um Desfazer). Arrastar um card marcado leva a seleção inteira para a pasta.
 - **+ Nova:** tarefa criada à mão, sem IA (`POST /api/itens`). Prazo em texto livre ("sexta 14h") pelas mesmas regras; criticidade automática pelo prazo ou escolhida.
 - **Lixeira:** Excluir arquiva. "Apagar de vez" e "Esvaziar" pedem confirmação, removem o item e o diário dele e reescrevem a nota original sem o texto apagado (ou apagam a nota, se era o último item).
 
@@ -90,7 +90,15 @@ Proposta só é aplicada se `base_rev == rev` atual e nunca sobrescreve campo ma
 4. Experimento de IA no celular com benchmark
 5. Extras: embeddings, OCR, export Obsidian, SQLCipher
 
+## Próximo desenho: app no celular sem o PC (decidido, não implementado)
+- PWA no GitHub Pages (é também o modo demo clicável); dados no IndexedDB do aparelho; o celular passa a ser a fonte da verdade e o PC vira só IA, sem sincronização.
+- PC sem estado: `/ia/classificar`, `/ia/editor`, `/ia/chat` com token por aparelho e CORS só para o domínio do Pages. Datas continuam no `rules.py` do PC; offline, a criação manual usa o seletor de data nativo.
+- Ligação por Tailscale serve (rede privada, HTTPS fixo); túnel + chave no QR só como plano B. O exe ganha "Conectar celular": detecta o Tailscale e mostra um QR com endereço e token de uso único.
+- Quando a fase 1 entrar, a regra "servidor é a fonte da verdade" (CLAUDE.md) muda.
+
 ## Pendências
-- Regras em Kotlin e Python devem passar nos mesmos casos (`tests/` → fixture compartilhada).
-- Dataset: crescer de 10 para 150-300 casos sintéticos + conjunto privado.
-- Calibrar "confiança" por logprob do token do enum, não autodeclarada.
+1. Fase 1 do celular (IndexedDB em JS: pastas, Lixeira, Desfazer) e demo no GitHub Pages.
+2. PC só IA + "Conectar celular" (QR + Tailscale); limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
+3. Bot do Telegram para lembretes (sem código ainda; testar contra um Telegram falso).
+4. Qualidade: pasta 91%, texto riscado na foto 76%, efeito da instrução junto com a foto não medido.
+5. Release v1.0 do exe (só na versão final).

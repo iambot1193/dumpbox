@@ -74,6 +74,7 @@ Quando você muda um item de pasta (arrastando, pelo menu ou por instrução) e 
 | Somar ou tirar | Ctrl+clique | toque |
 | Intervalo | Shift+clique | |
 | Laço | arrastar no espaço vazio | |
+| Pincel | Shift + segurar o botão sobre um card e passar o mouse pelos outros | |
 | Todos / limpar | Ctrl+A / Esc | |
 | Excluir | Delete | barra de ações |
 

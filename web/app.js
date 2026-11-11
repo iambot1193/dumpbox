@@ -216,6 +216,29 @@ function clicarCard(e, id) {
   marcarSel();
 }
 
+// ---- pincel: Shift + segurar o botão sobre um card e passar o mouse marca cada card por onde passar ----
+// Soma à seleção atual. Shift+clique sem mexer continua sendo intervalo (clicarCard).
+function pincel(ini, id) {
+  ini.preventDefault();
+  let ativo = false;
+  const add = n => { if (!sel.has(n)) { sel.add(n); ancora = n; marcarSel(); } };
+  const mover = e => {
+    if (!ativo) {
+      if (Math.hypot(e.clientX - ini.clientX, e.clientY - ini.clientY) < 5) return;
+      ativo = gesto = true; fecharMenu(); add(id);
+    }
+    const c = document.elementFromPoint(e.clientX, e.clientY)?.closest("#vista article.c[data-id]");
+    if (c) add(+c.dataset.id);
+  };
+  const soltar = () => {
+    document.removeEventListener("pointermove", mover); document.removeEventListener("pointerup", soltar);
+    if (!ativo) return;
+    gesto = false;
+    arrastou = true; setTimeout(() => { arrastou = false; }, 0);  // o clique depois do soltar não refaz como intervalo
+  };
+  document.addEventListener("pointermove", mover); document.addEventListener("pointerup", soltar);
+}
+
 // ---- laço: segurar no espaço vazio e arrastar marca os cards que o retângulo tocar ----
 // ponytail: sem rolagem automática na borda; laço maior que a tela, role antes ou use Shift+clique
 document.addEventListener("pointerdown", ini => {
@@ -338,6 +361,7 @@ function arrastavel(card, it) {
   card.addEventListener("contextmenu", e => { if (matchMedia("(hover:none)").matches) e.preventDefault(); });
   card.addEventListener("pointerdown", ini => {
     if (ini.button || ini.target.closest("button,.rs")) return;
+    if (ini.shiftKey && ini.pointerType === "mouse") return pincel(ini, it.id);  // Shift segurado: seleciona, não move
     const toque = ini.pointerType === "touch", r = card.getBoundingClientRect();
     const grabX = ini.clientX - r.left, grabY = ini.clientY - r.top;
     let clone = null, alvo = null, ph = null, cel = null, timer = null;

@@ -573,8 +573,21 @@ def test_foto_de_lista():
     assert c.post("/api/desfazer", json={"grupo": grupo}).json()["revertidas"] == 1  # fechar pela foto tem Desfazer
 
 
+def test_backup_diario():
+    pasta = Path(tempfile.mkdtemp())
+    conn = db.conectar()
+    for n in range(16):  # backups antigos: só os 14 mais novos ficam
+        (pasta / f"dumpbox-2026-01-{n + 1:02d}.db").write_bytes(b"")
+    feito = db.backup_diario(conn, pasta)
+    assert feito and feito.stat().st_size > 0 and db.backup_diario(conn, pasta) is None  # 1 por dia
+    import sqlite3
+    assert sqlite3.connect(feito).execute("SELECT COUNT(*) FROM pasta").fetchone()[0] > 0  # cópia legível
+    assert len(list(pasta.glob("dumpbox-*.db"))) == 14
+
+
 if __name__ == "__main__":
     test_fluxo()
+    test_backup_diario()
     test_foto_de_lista()
     test_nota_offline_usa_hora_da_escrita()
     test_prazo_por_regra_corrige_o_modelo()

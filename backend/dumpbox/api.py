@@ -45,6 +45,7 @@ def _worker(parar: threading.Event) -> None:
     c = db.conectar()
     while not parar.is_set():
         try:
+            db.backup_diario(c)  # no máximo 1 por dia; barato quando já existe
             if not ollama_mgr.pronto() or not processar_pendentes(c):  # IA ainda preparando: notas ficam pendentes
                 parar.wait(2)
         except Exception:  # worker nunca morre; erro de uma nota não derruba as outras

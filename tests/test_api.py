@@ -62,6 +62,16 @@ def test_fluxo():
     assert ed(iid, "titulo", "x").status_code == 422           # campo fora da lista da tela
     assert ed(999, "estado", "feito").status_code == 404
     assert c.post("/api/desfazer", json={"grupo": g["grupo"]}).json()["revertidas"] == 1
+    # botão Editar do card: vários campos num Desfazer só; um campo inválido barra tudo
+    card = lambda m: c.post(f"/api/itens/{iid}/editar", json={"mudancas": m})
+    tit0 = conn.execute("SELECT titulo FROM item WHERE id=?", (iid,)).fetchone()[0]
+    assert card({"titulo": "Titulo novo", "tipo": "xxx"}).status_code == 422
+    assert conn.execute("SELECT titulo FROM item WHERE id=?", (iid,)).fetchone()[0] == tit0
+    g = card({"titulo": "Titulo novo", "tipo": "ideia", "prazo": "amanhã"}).json()
+    assert g["n"] == 3 and g["grupo"]
+    assert c.post("/api/desfazer", json={"grupo": g["grupo"]}).json()["revertidas"] == 3
+    assert conn.execute("SELECT titulo FROM item WHERE id=?", (iid,)).fetchone()[0] == tit0
+    assert c.post("/api/itens/999/editar", json={"mudancas": {"tipo": "ideia"}}).status_code == 404
 
 
 def test_pastas_grade_lixeira():

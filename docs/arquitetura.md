@@ -90,15 +90,14 @@ Proposta só é aplicada se `base_rev == rev` atual e nunca sobrescreve campo ma
 4. Experimento de IA no celular com benchmark
 5. Extras: embeddings, OCR, export Obsidian, SQLCipher
 
-## Próximo desenho: app no celular sem o PC (decidido, não implementado)
-- PWA no GitHub Pages (é também o modo demo clicável); dados no IndexedDB do aparelho; o celular passa a ser a fonte da verdade e o PC vira só IA, sem sincronização.
-- PC sem estado: `/ia/classificar`, `/ia/editor`, `/ia/chat` com token por aparelho e CORS só para o domínio do Pages. Datas continuam no `rules.py` do PC; offline, a criação manual usa o seletor de data nativo.
-- Ligação por Tailscale serve (rede privada, HTTPS fixo); túnel + chave no QR só como plano B. O exe ganha "Conectar celular": detecta o Tailscale e mostra um QR com endereço e token de uso único.
-- Quando a fase 1 entrar, a regra "servidor é a fonte da verdade" (CLAUDE.md) muda.
+## Próximo desenho: celular offline-first (decidido, não implementado)
+PC continua fonte da verdade; celular guarda cópia + fila de alterações e sincroniza pelo Tailscale (HTTPS via `tailscale serve`),
+o mais recente vence por campo. Plano completo e roteiro de teste: [plano-sync.md](plano-sync.md).
+(Substitui o desenho anterior "celular fonte da verdade, PC só IA, sem sincronização".)
 
 ## Pendências
-1. Fase 1 do celular (IndexedDB em JS: pastas, Lixeira, Desfazer) e demo no GitHub Pages.
-2. PC só IA + "Conectar celular" (QR + Tailscale); limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
+1. Sincronização celular↔PC: [plano-sync.md](plano-sync.md).
+2. Demo clicável no GitHub Pages; "Conectar celular" (QR para o endereço `ts.net`); limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
 3. Bot do Telegram para lembretes (sem código ainda; testar contra um Telegram falso).
 4. Qualidade: pasta 91%, texto riscado na foto 76%, efeito da instrução junto com a foto não medido.
 5. Release v1.0 do exe (só na versão final).

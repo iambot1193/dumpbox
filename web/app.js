@@ -221,7 +221,12 @@ function clicarCard(e, id) {
 function pincel(ini, id) {
   ini.preventDefault();
   let ativo = false;
-  const add = n => { if (!sel.has(n)) { sel.add(n); ancora = n; marcarSel(); } };
+  const marca = !sel.has(id);  // card inicial já marcado: o gesto inteiro desmarca
+  const add = n => {
+    if (sel.has(n) === marca) return;
+    if (marca) { sel.add(n); ancora = n; } else sel.delete(n);
+    marcarSel();
+  };
   const mover = e => {
     if (!ativo) {
       if (Math.hypot(e.clientX - ini.clientX, e.clientY - ini.clientY) < 5) return;
@@ -280,29 +285,41 @@ document.addEventListener("keydown", e => {
 
 // ---- tarefa criada à mão (sem IA) ----
 function opcoes(s, lista, padrao) { for (const [v, t] of lista) { const o = el("option", "", t); o.value = v; s.append(o); } s.value = padrao; return s; }
-function novaTarefa() {
+function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
   dlgAberto = true; fecharMenu();
   const v = el("div", "veu"), f = el("form", "dlg nova"), fim = () => { v.remove(); f.remove(); dlgAberto = false; };
   const campo = (rot, ctl) => { const l = el("label"); l.append(el("span", "", rot), ctl); return l; };
   const titulo = el("input"); titulo.required = true; titulo.maxLength = 200; titulo.placeholder = "O que precisa fazer?";
-  const pastaS = opcoes(el("select"), PASTAS, NOME[vista] ? vista : "casa");
-  const tipo = opcoes(el("select"), TIPOS.map(t => [t, t]), "tarefa");
-  const crit = opcoes(el("select"), [["", "automática"], ...NIVEIS.map(([v, n]) => [v, n])], "");
-  const prazo = el("input"); prazo.maxLength = 60; prazo.placeholder = "ex.: sexta 14h, amanhã, dia 20"; prazo.value = vista === "hoje" ? "hoje" : "";
-  const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", "Criar");
+  const pastaS = opcoes(el("select"), PASTAS, it ? pasta(it) : NOME[vista] ? vista : "casa");
+  const tipo = opcoes(el("select"), TIPOS.map(t => [t, t]), it?.tipo || "tarefa");
+  const crit = opcoes(el("select"), it ? NIVEIS.map(([v, n]) => [v, n]) : [["", "automática"], ...NIVEIS.map(([v, n]) => [v, n])], it?.prioridade || "");
+  const prazo = el("input"); prazo.maxLength = 60; prazo.placeholder = it?.prazo_em ? `${txtPrazo(it.prazo_em)} (vazio = manter)` : "ex.: sexta 14h, amanhã, dia 20";
+  prazo.value = !it && vista === "hoje" ? "hoje" : "";
+  if (it) titulo.value = it.titulo || "";
+  const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
   no.type = "button"; no.onclick = fim; v.onclick = fim;
   f.onkeydown = e => { if (e.key === "Escape") fim(); };
   f.onsubmit = async e => {
     e.preventDefault(); si.disabled = true;
     try {
+      if (it) {
+        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazo.value.trim() };
+        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: "" };
+        for (const k in m) if (m[k] === (antes[k] || "")) delete m[k];
+        if (Object.keys(m).length) {
+          const r = await api(`/api/itens/${it.id}/editar`, { mudancas: m });
+          if (r.grupo) { (vistos ||= new Set()).add(r.grupo); toast(r.descricao, r.grupo); }
+        }
+        fim(); ultimo = ""; return atualizar();
+      }
       const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazo.value || null });
       fim(); toast(r.descricao); ultimo = ""; atualizar();
-    } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : "Não consegui criar. O PC está ligado?"; }
+    } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
   const linha2 = el("div", "duas"); linha2.append(campo("Pasta", pastaS), campo("Tipo", tipo));
   const linha3 = el("div", "duas"); linha3.append(campo("Prazo", prazo), campo("Criticidade", crit));
   pe.append(no, si);
-  f.append(el("h4", "", "Nova tarefa"), campo("Título", titulo), linha2, linha3, erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), linha2, linha3, erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----
@@ -339,7 +356,7 @@ function apagarPasta(slug) {
     return () => { toast(r.descricao); ir("hoje"); ultimo = ""; atualizar(); };
   });
 }
-const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefa à mão", novaTarefa);
+const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefa à mão", () => novaTarefa());
 const botaoSel = () => botao("bsel" + (modoSel ? " on" : ""), ["Selecionar"], "Selecionar vários (no PC: Ctrl+clique, Shift+clique, Ctrl+A)",
   e => { modoSel = !modoSel; if (!modoSel) sel.clear(); e.currentTarget.classList.toggle("on", modoSel); marcarSel(); });
 
@@ -483,7 +500,7 @@ function cartao(it, comPasta) {
   }
   const acts = el("div", "acts"), dir = el("div");
   const feito = aberto(it);
-  dir.append(botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
+  dir.append(botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)), botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
     botao("tr", [ic("trash")], "Excluir", () => editar(it.id, "estado", "arquivado")));
   acts.append(botao("ok", [ic(feito ? "check" : "retry")], feito ? "Marcar como feito" : "Reabrir", () => editar(it.id, "estado", feito ? "feito" : "catalogado")), dir);
   a.append(acts);

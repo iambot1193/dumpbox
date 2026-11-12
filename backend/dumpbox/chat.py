@@ -49,7 +49,10 @@ AJUDA_ACOES = """Ações (tipo / item_id / valor):
 - deduplicar / null / null: arquiva os itens repetidos e mantém o mais novo de cada grupo (o servidor acha os duplicados)"""
 
 SISTEMA = f"""Você é o assistente das notas do usuário. Responda em português, curto e direto.
-Você recebe a lista de itens (um por linha: #id | título | tipo | contexto | prazo | prioridade | estado) e a data de hoje.
+Você recebe a lista de itens (um por linha: #id | título | tipo | contexto | prazo | prioridade | estado | palavras) e a data de hoje.
+- "Nota", "anotação" ou "item" sem tipo explícito = qualquer item da lista, de qualquer tipo. Só filtre por tipo
+  quando o usuário pedir o tipo ("quais tarefas?"). Nunca responda "não há notas" se a lista tem itens.
+- Tamanho ("mais extensa", "maior", "mais longa"): use o campo palavras e a linha "Mais longos", nunca estime.
 - Perguntas ("o que tenho pra sexta?", "quais compras?"): responda usando só a lista, citando os itens. Não invente itens.
 - Pedidos de mudança: devolva em "acoes" e explique em "resposta" (o servidor aplica e o usuário pode desfazer).
 {AJUDA_ACOES}
@@ -95,8 +98,16 @@ def contexto_itens(c, limite: int = 60, detalhado: bool = False) -> str:
     for r in rows:
         extra = f" | criado={r['criado_em']}" + (" | REPETIDO (há um mais novo igual)" if r["id"] in repetidos else "") if detalhado else ""
         lin.append(f"#{r['id']} | {str(r['titulo']).replace(chr(10), ' ')} | {r['tipo']} | {r['contexto']} | "
-                   f"prazo={prazo(r['prazo_em'])} | {r['prioridade']} | {r['estado']}{extra}")
+                   f"prazo={prazo(r['prazo_em'])} | {r['prioridade']} | {r['estado']}"
+                   + (f" | palavras={_palavras(r['titulo'])}" if detalhado else "") + extra)
+    if detalhado and rows:  # modelo de 7B não conta palavras nem compara 60 números: ranking já calculado
+        top = sorted(rows, key=lambda r: -_palavras(r["titulo"]))[:3]
+        lin.append("Mais longos (palavras): " + ", ".join(f"#{r['id']} ({_palavras(r['titulo'])})" for r in top))
     return "\n".join(lin) or "(nenhum item)"
+
+
+def _palavras(t) -> int:
+    return len(str(t or "").split())
 
 
 def _ollama(mensagens: list[dict]) -> str:
@@ -139,7 +150,7 @@ def validar(c, a: Acao, agora: datetime) -> tuple[Acao, str]:
             raise ValueError("pasta inexistente")
         return a.model_copy(update={"valor": s}), f"Mover “{titulo}” para {db.nome_pasta(s)}"
     if a.tipo == "titulo":
-        if not v or len(v) > 80:
+        if not v or len(v) > 200:  # mesmo limite da tarefa criada à mão
             raise ValueError("título inválido")
         return a.model_copy(update={"valor": v}), f"Renomear “{titulo}” para “{v}”"
     if a.tipo == "tipo":

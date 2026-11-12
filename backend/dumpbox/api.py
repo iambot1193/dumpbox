@@ -241,6 +241,27 @@ def editar_itens(body: Edicao, c=Depends(conexao)):
     return {"grupo": grupo, "descricao": descricao, "n": n}
 
 
+class EdicaoCard(BaseModel):
+    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo"], str] = Field(min_length=1)
+
+
+@app.post("/api/itens/{item_id}/editar", dependencies=[Depends(exige_login)])
+def editar_card(item_id: int, body: EdicaoCard, c=Depends(conexao)):
+    """Botão Editar do card: vários campos de um item, tudo ou nada, um Desfazer."""
+    validas = []
+    for campo, valor in body.mudancas.items():
+        try:
+            validas.append(chat.validar(c, chat.Acao(tipo=campo, item_id=item_id, valor=valor), datetime.now())[0])
+        except ValueError as e:
+            raise HTTPException(404 if "inexistente" in str(e) else 422, f"{campo}: {e}")
+    grupo = str(uuid.uuid4())
+    n = sum(chat.aplicar(c, a, grupo) for a in validas)
+    if not n:
+        return {"grupo": None, "descricao": None, "n": 0}
+    titulo = c.execute("SELECT titulo FROM item WHERE id=?", (item_id,)).fetchone()["titulo"]
+    return {"grupo": grupo, "descricao": f"“{titulo}” editado", "n": n}
+
+
 @app.post("/api/itens", dependencies=[Depends(exige_login)])
 def criar_item(body: NovoItem, c=Depends(conexao)):
     """Tarefa criada à mão: sem IA. Prazo e prioridade pelas mesmas regras do classificador."""

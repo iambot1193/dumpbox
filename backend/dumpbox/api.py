@@ -1,6 +1,7 @@
 """API + PWA. Rodar: uvicorn dumpbox.api:app --host 127.0.0.1 --port 8000 (expor só via Tailscale)."""
 import base64
 import os
+import re
 import sys
 import threading
 import time
@@ -10,7 +11,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -64,6 +66,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="dumpbox", lifespan=lifespan)
+# App do GitHub Pages conectado ao PC (web/local.js): outra origem, só com token Bearer (sem cookie).
+ORIGENS = [o for o in os.getenv("DUMPBOX_ORIGENS", "https://iambot1193.github.io").split(",") if o]
+app.add_middleware(CORSMiddleware, allow_origins=ORIGENS, allow_methods=["GET", "POST"],
+                   allow_headers=["Authorization", "Content-Type"], max_age=600,
+                   allow_private_network=True)  # Chrome: site público -> IP da Tailscale (100.x)
+
 
 
 def conexao():
@@ -74,8 +82,9 @@ def conexao():
         c.close()
 
 
-def exige_login(sess: str | None = Cookie(default=None)) -> None:
-    if not auth.token_valido(sess):
+def exige_login(sess: str | None = Cookie(default=None), authorization: str | None = Header(default=None)) -> None:
+    bearer = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
+    if not (auth.token_valido(sess) or auth.token_valido(bearer)):
         raise HTTPException(401, "não autenticado")
 
 
@@ -165,9 +174,10 @@ def login(body: Login, request: Request, response: Response):
         raise HTTPException(503, "defina DUMPBOX_PASSWORD_HASH")
     if not auth.confere_senha(body.senha, guardado):
         raise HTTPException(401, "senha incorreta")
-    response.set_cookie("sess", auth.novo_token(), httponly=True, samesite="strict",
+    token = auth.novo_token()
+    response.set_cookie("sess", token, httponly=True, samesite="strict",
                         secure=os.getenv("DUMPBOX_COOKIE_SECURE", "0") == "1", max_age=auth.SESSAO_S)
-    return {"ok": True}
+    return {"ok": True, "token": token}  # token: app do Pages (outra origem) manda como Bearer
 
 
 @app.post("/api/logout")
@@ -272,7 +282,10 @@ def criar_item(body: NovoItem, c=Depends(conexao)):
         raise HTTPException(422, "título vazio")
     if not pasta:
         raise HTTPException(422, "pasta inexistente")
-    prazo_em = rules.resolver_prazo(texto_prazo, agora) if texto_prazo else None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?", texto_prazo):  # já resolvido (vindo do modo celular)
+        prazo_em = texto_prazo
+    else:
+        prazo_em = rules.resolver_prazo(texto_prazo, agora) if texto_prazo else None
     if texto_prazo and not prazo_em:
         raise HTTPException(422, f"não entendi a data “{texto_prazo}”. Tente “sexta 14h”, “amanhã” ou “dia 20”.")
     cid = str(uuid.uuid4())

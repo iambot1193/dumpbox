@@ -10,7 +10,7 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 - Senha (1x): pela tela no 1º acesso, ou `PYTHONPATH=backend python -m dumpbox.setup` → `<home>/config.env`.
 - Exe: `.\build.ps1` → `dist\dumpbox.exe` (PyInstaller; entrada `run.py` → `launcher.py`). 1º uso: tela cria senha (só do PC local) e `ollama_mgr.py` baixa Ollama portátil + modelo por RAM. Release automática: `.github/workflows/release.yml` (tag `v*`).
 - Cuidado: caminhos com `\\` passados por heredoc/python -c chegam colapsados; escreva texto com barras invertidas via Write/Edit.
-- Modo celular: `web/local.js` responde /api/* no localStorage quando em *.github.io ou `?local=1`; publicado por `.github/workflows/pages.yml`. Regras de prazo copiadas de `rules.py`: mudou uma, mude a outra (`ui_local.py` compara).
+- Modo celular: `web/local.js` responde /api/* no localStorage quando em *.github.io ou `?local=1`; publicado por `.github/workflows/pages.yml`. Conectado (`dumpbox.pc` no localStorage): rotas vão ao PC com Bearer (token devolvido no /api/login), CORS só p/ `DUMPBOX_ORIGENS`. Regras de prazo copiadas de `rules.py`: mudou uma, mude a outra (`ui_local.py` compara).
 - Chat (`chat.py`): ações aplicadas na hora, só sobre item citado no pedido, sempre reversíveis (diário `alteracao`). Apagar de vez só pela Lixeira, nunca pela IA.
 - Avaliar: `python eval/run_eval.py qwen2.5:1.5b` (precisa Ollama: `$env:OLLAMA_MODELS="D:\Ollama\models"; D:\Ollama\ollama.exe serve`)
 - Schema: `PYTHONUTF8=1 PYTHONPATH=backend python -m dumpbox.schema > schema/saida_ia.schema.json`

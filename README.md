@@ -71,7 +71,7 @@ Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a esco
 - A janela do dumpbox precisa ficar aberta enquanto você usa (no PC ou no celular).
 
 **Celular (opcional)**
-- Sem o PC: abra [iambot1193.github.io/dumpbox](https://iambot1193.github.io/dumpbox/) e use "Adicionar à tela inicial". É o **modo celular**: as notas ficam só no aparelho, sem IA (sem chat e sem foto de lista); o envio para o PC chega numa próxima versão. Abaixo, o uso completo com o PC.
+- Sem o PC: abra [iambot1193.github.io/dumpbox](https://iambot1193.github.io/dumpbox/) e use "Adicionar à tela inicial". É o **modo celular**: as notas ficam só no aparelho, sem IA (sem chat e sem foto de lista); para levar ao PC, toque no aviso do topo, informe o endereço do Tailscale do PC (`https://<pc>.ts.net`) e a senha: as notas sobem e o app passa a usar o PC (com IA). Abaixo, o que o PC precisa.
 - Navegador atual: Chrome no Android ou Safari no iPhone.
 - O PC precisa estar ligado com o dumpbox aberto. Sem o PC, o celular só guarda notas novas numa fila e as envia quando o PC voltar.
 - [Tailscale](https://tailscale.com) instalado e logado na mesma conta no PC e no celular, e `tailscale serve --bg 8000` no PC (use a porta mostrada na janela do dumpbox). Isso dá HTTPS, necessário para instalar como app na tela inicial.

@@ -1,19 +1,26 @@
 """Modo celular (web/local.js): o app sem servidor, como fica no GitHub Pages. Chrome headless, tela de celular.
 Serve a raiz do repo e abre /web/?local=1 (subcaminho, igual ao Pages). Datas conferidas contra rules.py.
+No fim conecta a um servidor de verdade (banco temporário, outra origem = CORS + token) e confere o envio das notas.
 
     python tests/ui_local.py        (precisa de playwright; caminho extra: DUMPBOX_PW_PATH)
 """
 import functools
 import http.server
 import os
+import subprocess
 import sys
+import tempfile
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path[:0] = [p for p in (os.getenv("DUMPBOX_PW_PATH"), str(RAIZ / "backend")) if p]
+os.environ.update(DUMPBOX_HOME=tempfile.mkdtemp(prefix="dumpbox_local_"), DUMPBOX_WORKER="0", DUMPBOX_SECRET="teste-local", DUMPBOX_NO_BROWSER="1")
+from dumpbox import auth, db  # noqa: E402
 from dumpbox.rules import resolver_prazo  # noqa: E402
+os.environ["DUMPBOX_PASSWORD_HASH"] = auth.hash_senha("senha-de-teste")
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 class Mudo(http.server.SimpleHTTPRequestHandler):
@@ -23,6 +30,9 @@ class Mudo(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Mudo, directory=str(RAIZ)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = f"http://127.0.0.1:{srv.server_port}/web/?local=1"
+PC = "http://127.0.0.1:8125"
+pc = subprocess.Popen([sys.executable, "-m", "uvicorn", "dumpbox.api:app", "--port", "8125", "--log-level", "warning"], cwd=RAIZ,
+                      env={**os.environ, "PYTHONPATH": str(RAIZ / "backend"), "DUMPBOX_ORIGENS": f"http://127.0.0.1:{srv.server_port}"})
 falhas = []
 
 
@@ -39,7 +49,7 @@ with sync_playwright() as p:
     g = b.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True).new_page()
     erros = []
     g.on("pageerror", lambda e: erros.append(str(e)))
-    g.on("response", lambda r: erros.append(f"{r.status} {r.url}") if r.status >= 400 else None)
+    g.on("response", lambda r: erros.append(f"{r.status} {r.url}") if r.status >= 400 and r.status != 401 else None)
     g.goto(URL)
     g.wait_for_selector("#nav .fold")
     ok("Modo celular" in g.inner_text("#prep"), "aviso de modo celular no topo")
@@ -75,8 +85,31 @@ with sync_playwright() as p:
     g.reload()
     g.wait_for_selector("#nav .fold")
     ok(g.locator('[data-alvo="projetos_pessoais"]').count() == 1, "abre sem internet com os dados do aparelho")
+
+    # ---- conectar ao PC: endereço pelo aviso do topo, senha do PC, notas locais sobem ----
+    g.context.set_offline(False)
+    g.reload()
+    g.wait_for_selector("#nav .fold")
+    g.once("dialog", lambda d: d.accept(PC))
+    g.click("#prep")
+    g.wait_for_selector("#login:not([hidden])")
+    ok(g.locator("#login button", has_text="desconectar").count() == 1, "login do PC com opção de desconectar")
+    g.fill("#senha", "senha-de-teste")
+    g.click("#entrar")
+    g.wait_for_selector("#toast >> text=enviado", timeout=10000)
+    c = db.conectar()
+    cap = c.execute("SELECT texto FROM captura WHERE texto LIKE 'comprar pilhas%'").fetchone()
+    tarefa = c.execute("SELECT contexto, prazo_em FROM item WHERE titulo='Pagar boleto'").fetchone()
+    ok(cap and cap[0] == "comprar pilhas\nAA e AAA","nota intacta vai para a IA do PC (texto completo)")
+    ok(tarefa and tuple(tarefa) == ("financas", resolver_prazo("semana que vem", datetime.now())), "tarefa editada vai com pasta e prazo")
+    ok(g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens.length") == 0, "nada fica duplicado no aparelho")
+    ok(g.evaluate("!!localStorage['dumpbox.token']") and g.locator("#fab").is_visible(), "conectado: token salvo, chat da IA aparece")
+    g.reload()
+    g.wait_for_selector("#nav .fold")
+    ok(g.locator("#app").is_visible(), "continua logado no PC depois de recarregar (token)")
     ok(not erros, f"sem erros no console/rede {erros[:3]}")
     b.close()
 srv.shutdown()
+pc.terminate()
 print("FALHAS:", falhas if falhas else "nenhuma")
 sys.exit(1 if falhas else 0)

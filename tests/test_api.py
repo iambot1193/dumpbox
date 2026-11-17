@@ -512,6 +512,29 @@ def test_rate_limit_e_token():
     assert not auth.limite_ok("9.9.9.9")
 
 
+def test_celular_conectado_por_token():
+    """App do GitHub Pages (outra origem): login devolve token, que vale como Bearer; CORS só para a origem do Pages."""
+    pages = {"Origin": "https://iambot1193.github.io"}
+    c = TestClient(api.app)
+    tok = c.post("/api/login", json={"senha": "senha-certa"}, headers=pages).json()["token"]
+    c.cookies.clear()  # o celular não manda cookie para outra origem
+    assert c.get("/api/itens").status_code == 401
+    assert c.get("/api/itens", headers={"Authorization": "Bearer lixo"}).status_code == 401
+    r = c.get("/api/itens", headers={**pages, "Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == pages["Origin"]
+    pre = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type",
+           "Access-Control-Request-Private-Network": "true"}
+    r = c.options("/api/capturas", headers={**pages, **pre})
+    assert r.status_code == 200 and r.headers["access-control-allow-private-network"] == "true"
+    r = c.options("/api/capturas", headers={"Origin": "https://malicioso.example", **pre})
+    assert "access-control-allow-origin" not in r.headers  # sem isso o navegador bloqueia a outra origem
+    # tarefa do celular já vem com a data resolvida (ISO)
+    r = c.post("/api/itens", json={"titulo": "Vinda do celular", "contexto": "casa", "prazo": "2027-03-04T09:30"},
+               headers={"Authorization": f"Bearer {tok}"})
+    it = next(i for i in c.get("/api/itens", headers={"Authorization": f"Bearer {tok}"}).json()["itens"] if i["id"] == r.json()["id"])
+    assert it["prazo_em"] == "2027-03-04T09:30"
+
+
 def test_nota_offline_usa_hora_da_escrita():
     """Nota escrita offline e enviada dias depois: "amanhã" conta da hora da escrita, não do processamento."""
     from datetime import timedelta
@@ -597,6 +620,7 @@ def test_backup_diario():
 
 if __name__ == "__main__":
     test_fluxo()
+    test_celular_conectado_por_token()
     test_backup_diario()
     test_foto_de_lista()
     test_nota_offline_usa_hora_da_escrita()

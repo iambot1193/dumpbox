@@ -1,5 +1,6 @@
 // Modo celular (GitHub Pages ou ?local=1): o app roda sem o PC. Responde às mesmas rotas /api/* que o servidor,
 // guardando tudo no localStorage deste aparelho. Sem IA: cada nota vira um item "nota" na pasta Outro.
+// Conectado ao PC (endereço em dumpbox.pc): as rotas vão para o PC com token Bearer, e as notas locais sobem uma vez.
 // ponytail: só o que a tela usa; regras de prazo/prioridade copiadas de rules.py (manter as duas iguais).
 (() => {
   const LOCAL = location.hostname.endsWith("github.io") || new URLSearchParams(location.search).has("local");
@@ -82,7 +83,7 @@
 
   const R = [  // [método, regex, função(corpo, ...grupos)]
     ["GET", /^estado$/, () => ({ configurado: true, preparo: { pronto: false, erro: null },
-      aviso: "Modo celular: as notas ficam neste aparelho, sem IA. Envio para o PC chega numa próxima versão." })],
+      aviso: "Modo celular: notas só neste aparelho, sem IA. Toque aqui para conectar ao PC." })],
     ["POST", /^(login|logout|setup)$/, () => ({ ok: true })],
     ["GET", /^sessao$/, () => ({ ok: true })],
     ["POST", /^capturas$/, b => {
@@ -157,8 +158,63 @@
   ];
 
   const fetchRede = window.fetch.bind(window);
+  const rota = url => typeof url === "string" && url.match(/\/api\/(.+)$/)?.[1];
+  const ler = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const PC = ler("dumpbox.pc");
+
+  if (PC) {  // ---- conectado: o PC é o servidor (IA, chat, foto); sem conexão, a fila de notas do app.js guarda ----
+    let enviando = false;
+    const comToken = op => { const t = ler("dumpbox.token"); return t ? { ...op, headers: { ...op.headers, Authorization: "Bearer " + t } } : op; };
+    async function enviarLocais() {  // itens feitos no modo celular sobem uma vez; cópia fica em dumpbox.local.enviado
+      const abertos = S.itens.filter(i => i.estado === "catalogado");
+      if (enviando || !abertos.length) return;
+      enviando = true;
+      try { localStorage.setItem(K + ".enviado", JSON.stringify(S)); } catch {}
+      let n = 0;
+      for (const it of abertos) {
+        const nota = it.captura_id && it.tipo === "nota" && it.contexto === "outro" && !it.prazo_em && it.titulo === it.texto.trim().split("\n")[0].slice(0, 200);
+        const envia = (rota, corpo) => fetchRede(PC + "/api/" + rota, comToken({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
+        try {
+          let r = nota ? await envia("capturas", { id: it.captura_id, texto: it.texto, criado_em: it.criado_em })  // intacta: a IA do PC classifica
+            : await envia("itens", { titulo: it.titulo, contexto: nomePasta(it.contexto), tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em });
+          if (r.status === 422 && !nota) r = await envia("itens", { titulo: it.titulo, contexto: "outro", tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em });
+          if (!r.ok) break;
+        } catch { break; }
+        S.itens = S.itens.filter(i => i !== it); n++;
+        try { salvar(); } catch {}
+      }
+      enviando = false;
+      if (n) toast(`${n} ite${n > 1 ? "ns" : "m"} do modo celular enviado${n > 1 ? "s" : ""} ao PC`);
+    }
+    window.fetch = async (url, op = {}) => {
+      const caminho = rota(url);
+      if (!caminho) return fetchRede(url, op);
+      const r = await fetchRede(PC + "/api/" + caminho, comToken(op));
+      if (caminho === "login" && r.ok) { localStorage.setItem("dumpbox.token", (await r.clone().json()).token); enviarLocais(); }
+      if (caminho === "sessao" && r.ok) enviarLocais();
+      if (caminho === "logout") localStorage.removeItem("dumpbox.token");
+      return r;
+    };
+    addEventListener("DOMContentLoaded", () => {
+      const b = document.createElement("button");
+      b.textContent = "Usar sem o PC (desconectar)"; b.className = "no";
+      b.onclick = () => { localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload(); };
+      document.getElementById("login").append(b);
+    });
+    return;
+  }
+
+  // ---- só no aparelho ----
+  async function conectar() {
+    let u = (prompt("Endereço do PC (o do Tailscale), ex.: https://meu-pc.tail1234.ts.net") || "").trim().replace(/\/+$/, "");
+    if (!u) return;
+    if (!/^https?:\/\//.test(u)) u = "https://" + u;
+    try { if (!(await fetchRede(u + "/api/estado")).ok) throw 0; }
+    catch { return toast("Não achei o dumpbox nesse endereço. O PC está ligado, com o Tailscale e o tailscale serve?"); }
+    localStorage.setItem("dumpbox.pc", u); location.reload();  // recarrega já conectado: pede a senha do PC
+  }
   window.fetch = async (url, op = {}) => {
-    const caminho = typeof url === "string" && url.match(/\/api\/(.+)$/)?.[1];
+    const caminho = rota(url);
     if (!caminho) return fetchRede(url, op);
     const metodo = op.method || "GET", corpo = op.body ? JSON.parse(op.body) : {};
     const json = (st, obj) => new Response(JSON.stringify(obj), { status: st, headers: { "Content-Type": "application/json" } });
@@ -171,7 +227,10 @@
     }
     return json(404, { detail: "indisponível no modo celular" });
   };
-  addEventListener("DOMContentLoaded", () => { for (const id of ["foto", "fab"]) document.getElementById(id).hidden = true; });
+  addEventListener("DOMContentLoaded", () => {
+    for (const id of ["foto", "fab"]) document.getElementById(id).hidden = true;
+    const p = document.getElementById("prep"); p.style.cursor = "pointer"; p.onclick = conectar;
+  });
   // foto colada (Ctrl+V) travaria a fila: sem IA não há quem leia a imagem
   document.addEventListener("paste", e => {
     if ([...(e.clipboardData?.items || [])].some(i => i.kind === "file")) { e.stopImmediatePropagation(); e.preventDefault(); toast("Foto de lista só com o PC."); }

@@ -83,7 +83,7 @@
 
   const R = [  // [método, regex, função(corpo, ...grupos)]
     ["GET", /^estado$/, () => ({ configurado: true, preparo: { pronto: false, erro: null },
-      aviso: "Modo celular: notas só neste aparelho, sem IA. Toque aqui para conectar ao PC." })],
+      aviso: "Modo celular: notas só neste aparelho, sem IA. Toque aqui para copiar do PC ou conectar." })],
     ["POST", /^(login|logout|setup)$/, () => ({ ok: true })],
     ["GET", /^sessao$/, () => ({ ok: true })],
     ["POST", /^capturas$/, b => {
@@ -166,7 +166,7 @@
     let enviando = false;
     const comToken = op => { const t = ler("dumpbox.token"); return t ? { ...op, headers: { ...op.headers, Authorization: "Bearer " + t } } : op; };
     async function enviarLocais() {  // itens feitos no modo celular sobem uma vez; cópia fica em dumpbox.local.enviado
-      const abertos = S.itens.filter(i => i.estado === "catalogado");
+      const abertos = S.itens.filter(i => i.estado === "catalogado" && i.origem !== "pc");  // cópia do PC não volta
       if (enviando || !abertos.length) return;
       enviando = true;
       try { localStorage.setItem(K + ".enviado", JSON.stringify(S)); } catch {}
@@ -205,6 +205,32 @@
   }
 
   // ---- só no aparelho ----
+  function importar(d) {  // cópia do PC (python -m dumpbox.exportar): substitui a cópia anterior, mantém o que nasceu aqui
+    if (d?.dumpbox !== 1 || !Array.isArray(d.itens) || !Array.isArray(d.pastas)) throw new Error("não é uma cópia do dumpbox");
+    const meus = S.itens.filter(i => i.origem !== "pc"), base = Math.max(0, ...d.itens.map(i => i.id));
+    meus.forEach((it, k) => { it.id = base + 1 + k; });  // ids do PC ficam iguais; os daqui vão para depois
+    const slugs = new Set(d.pastas.map(p => p.slug));
+    S = { seq: base + meus.length + 1, alt: [], pastas: [...d.pastas, ...S.pastas.filter(p => !slugs.has(p.slug))],
+      itens: [...d.itens.map(i => ({ ...i, origem: "pc" })), ...meus] };
+    salvar();
+    return d.itens.length;
+  }
+  function menu() {
+    dlgAberto = true;
+    const v = el("div", "veu"), d = el("div", "dlg"), pe = el("div"), fim = () => { v.remove(); d.remove(); dlgAberto = false; };
+    const arq = el("input"); arq.type = "file"; arq.accept = ".json,application/json"; arq.hidden = true;
+    arq.onchange = async () => {
+      fim();
+      try { const n = importar(JSON.parse(await arq.files[0].text())); toast(`${n} itens copiados do PC`); ultimo = ""; atualizar(); }
+      catch (e) { toast(`Não consegui importar: ${e.message}`); }
+    };
+    v.onclick = fim;
+    pe.append(botao("no", ["Cancelar"], null, fim), botao("no", ["Conectar"], "Usar o PC direto (Tailscale)", () => { fim(); conectar(); }),
+      botao("si ok", ["Importar cópia"], "Arquivo copia-celular-*.json gerado no PC", () => arq.click()));
+    d.append(el("h4", "", "Dados do PC"), el("p", "", "Importar cópia: escolha o arquivo copia-celular-….json gerado no PC. Substitui a cópia anterior; o que você criou aqui fica."),
+      el("p", "", "Conectar: usa o PC direto pelo Tailscale, com IA."), arq, pe);
+    document.body.append(v, d);
+  }
   async function conectar() {
     let u = (prompt("Endereço do PC (o do Tailscale), ex.: https://meu-pc.tail1234.ts.net") || "").trim().replace(/\/+$/, "");
     if (!u) return;
@@ -229,7 +255,7 @@
   };
   addEventListener("DOMContentLoaded", () => {
     for (const id of ["foto", "fab"]) document.getElementById(id).hidden = true;
-    const p = document.getElementById("prep"); p.style.cursor = "pointer"; p.onclick = conectar;
+    const p = document.getElementById("prep"); p.style.cursor = "pointer"; p.onclick = menu;
   });
   // foto colada (Ctrl+V) travaria a fila: sem IA não há quem leia a imagem
   document.addEventListener("paste", e => {

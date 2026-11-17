@@ -86,12 +86,34 @@ with sync_playwright() as p:
     g.wait_for_selector("#nav .fold")
     ok(g.locator('[data-alvo="projetos_pessoais"]').count() == 1, "abre sem internet com os dados do aparelho")
 
+    # ---- cópia do PC por arquivo (python -m dumpbox.exportar): entra no banco do aparelho, o que nasceu aqui fica ----
+    cpd = db.conectar()
+    cpd.execute("INSERT INTO captura(id,texto,criado_em,status) VALUES('seed','x','2026-01-01','ok')")
+    cpd.execute("INSERT INTO pasta(slug,nome,descricao,ordem,criado_em) VALUES('mercado','Mercado','',99,'2026-01-01')")
+    for t, ctx in [("Item do PC 1", "mercado"), ("Item do PC 2", "casa")]:
+        cpd.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prioridade,estado,criado_em) VALUES('seed','tarefa',?,?,'baixa','catalogado','2026-01-01')", (t, ctx))
+    cpd.commit()
+    arquivo = Path(tempfile.mkdtemp()) / "copia.json"
+    subprocess.run([sys.executable, "-m", "dumpbox.exportar", str(arquivo)], cwd=RAIZ, env={**os.environ, "PYTHONPATH": str(RAIZ / "backend")}, check=True, capture_output=True)
+    for t in ["Item do PC 1", "Item do PC 2"]:
+        cpd.execute("DELETE FROM item WHERE titulo=?", (t,))  # no PC somem: se o celular reenviar a cópia, o teste vê
+    cpd.commit()
+    g.click("#prep")
+    with g.expect_file_chooser() as fc:
+        g.click(".dlg button:has-text('Importar cópia')")
+    fc.value.set_files(str(arquivo))
+    g.wait_for_selector("#toast >> text=2 itens copiados do PC")
+    titulos = [i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"]]
+    ok({"Item do PC 1", "Item do PC 2", "comprar pilhas", "Pagar boleto"} <= set(titulos), f"cópia entra e o que nasceu no celular fica {titulos}")
+    ok(g.locator('[data-alvo="mercado"]').count() == 1, "pasta do PC aparece no celular")
+
     # ---- conectar ao PC: endereço pelo aviso do topo, senha do PC, notas locais sobem ----
     g.context.set_offline(False)
     g.reload()
     g.wait_for_selector("#nav .fold")
     g.once("dialog", lambda d: d.accept(PC))
     g.click("#prep")
+    g.click(".dlg button:has-text('Conectar')")
     g.wait_for_selector("#login:not([hidden])")
     ok(g.locator("#login button", has_text="desconectar").count() == 1, "login do PC com opção de desconectar")
     g.fill("#senha", "senha-de-teste")
@@ -102,7 +124,8 @@ with sync_playwright() as p:
     tarefa = c.execute("SELECT contexto, prazo_em FROM item WHERE titulo='Pagar boleto'").fetchone()
     ok(cap and cap[0] == "comprar pilhas\nAA e AAA","nota intacta vai para a IA do PC (texto completo)")
     ok(tarefa and tuple(tarefa) == ("financas", resolver_prazo("semana que vem", datetime.now())), "tarefa editada vai com pasta e prazo")
-    ok(g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens.length") == 0, "nada fica duplicado no aparelho")
+    ok(not c.execute("SELECT 1 FROM item WHERE titulo LIKE 'Item do PC%'").fetchone(), "cópia do PC não volta para o PC")
+    ok([i["titulo"] for i in g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens")] == ["Item do PC 1", "Item do PC 2"], "só a cópia fica no aparelho")
     ok(g.evaluate("!!localStorage['dumpbox.token']") and g.locator("#fab").is_visible(), "conectado: token salvo, chat da IA aparece")
     g.reload()
     g.wait_for_selector("#nav .fold")

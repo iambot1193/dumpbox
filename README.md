@@ -60,9 +60,26 @@ flowchart LR
 
 Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a escolhida foi a B2).
 
+## Requisitos
+
+**PC (onde o dumpbox roda)**
+- Windows 10 ou 11, 64 bits, para o `dumpbox.exe`. Outros sistemas: só pela instalação para desenvolvedores.
+- RAM: com 16 GB ou mais, usa `qwen2.5:7b`; com menos, usa `qwen2.5:1.5b` (mais leve, bem menos preciso).
+- Disco: ~10 GB livres no disco dos dados (`%LOCALAPPDATA%`, normalmente o C:) para o Ollama e os modelos.
+- Internet só no primeiro uso (download do Ollama e dos modelos). Depois, funciona sem internet.
+- O exe não é assinado: o Windows SmartScreen pede confirmação na primeira vez.
+- A janela do dumpbox precisa ficar aberta enquanto você usa (no PC ou no celular).
+
+**Celular (opcional)**
+- Sem o PC: abra [iambot1193.github.io/dumpbox](https://iambot1193.github.io/dumpbox/) e use "Adicionar à tela inicial". É o **modo celular**: as notas ficam só no aparelho, sem IA (sem chat e sem foto de lista); o envio para o PC chega numa próxima versão. Abaixo, o uso completo com o PC.
+- Navegador atual: Chrome no Android ou Safari no iPhone.
+- O PC precisa estar ligado com o dumpbox aberto. Sem o PC, o celular só guarda notas novas numa fila e as envia quando o PC voltar.
+- [Tailscale](https://tailscale.com) instalado e logado na mesma conta no PC e no celular, e `tailscale serve --bg 8000` no PC (use a porta mostrada na janela do dumpbox). Isso dá HTTPS, necessário para instalar como app na tela inicial.
+- O `dumpbox.exe` só aceita conexões do próprio PC, então "mesma rede Wi-Fi" sem Tailscale só funciona na instalação para desenvolvedores (`--host 0.0.0.0`).
+
 ## Usar (Windows, sem instalar nada)
 
-1. Baixe o `dumpbox.exe` em [Releases](../../releases) e dê duplo clique (a primeira release sai na versão 1.0; até lá, use a instalação para desenvolvedores abaixo).
+1. Baixe o `dumpbox.exe` em [Releases](../../releases) e dê duplo clique.
 2. Se o Windows mostrar "O Windows protegeu seu PC" (o exe não é assinado): **Mais informações → Executar assim mesmo**.
 3. O navegador abre sozinho. Crie uma senha e pronto.
 4. Na **primeira vez** o app baixa o motor de IA (Ollama) e o modelo, com barra de progresso na tela. Precisa de ~10 GB livres e internet. Enquanto isso você já pode guardar notas; elas são classificadas quando a IA ficar pronta.

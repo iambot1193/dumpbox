@@ -61,7 +61,7 @@ async function estado() {
     const e = await (await fetch("/api/estado")).json();
     const p = e.preparo, b = $("prep");
     b.hidden = p.pronto; topo();
-    if (!p.pronto) b.textContent = p.erro ? `Erro ao preparar a IA: ${p.erro}` : `Preparando a IA (só na primeira vez): ${p.msg || "aguarde"} ${p.pct ? p.pct + "%" : ""}`;
+    if (!p.pronto) b.textContent = e.aviso ? e.aviso : p.erro ? `Erro ao preparar a IA: ${p.erro}` : `Preparando a IA (só na primeira vez): ${p.msg || "aguarde"} ${p.pct ? p.pct + "%" : ""}`;
     return e;
   } catch {
     const b = $("prep"); b.hidden = false; topo();
@@ -718,7 +718,7 @@ async function iniciar() {
 window.addEventListener("online", () => { enviarFila().then(atualizar); });
 setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); } }, 5000);
 setInterval(() => { if (!$("prep").hidden) estado(); }, 3000);
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 iniciar();
 
 // ---- janela flutuante da IA: executa na hora, com Desfazer ----

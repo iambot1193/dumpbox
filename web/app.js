@@ -17,7 +17,7 @@ const AREA_GRADE = "(hover:hover) and (min-width:761px)";
 
 let D = { itens: [], revisar: [], lixeira: [] }, ultimo = "", vista = "hoje", verFeitos = false, filtro = null;
 let gesto = false, menuAberto = null, dlgAberto = false, vistos = null, gradeAtual = null;
-let sel = new Set(), ancora = null, modoSel = false, arrastou = false;  // seleção múltipla (Ctrl/Shift ou modo Selecionar)
+let sel = new Set(), ancora = null, modoSel = false, arrastou = false, semClique = 0;  // seleção múltipla (Ctrl/Shift ou modo Selecionar)
 const TIPOS = ["tarefa", "compromisso", "ideia", "compra", "nota"];
 try { vista = localStorage.getItem(VISTA) || "hoje"; } catch {}
 
@@ -188,6 +188,7 @@ function marcarSel() {
   for (const c of cardsVisiveis()) c.classList.toggle("sel", sel.has(+c.dataset.id));
   const b = $("barra"), n = sel.size;
   document.body.classList.toggle("com-barra", !!(n || modoSel));
+  document.querySelector(".bsel")?.classList.toggle("on", modoSel);
   if (!n && !modoSel) { b.hidden = true; return; }
   const ids = [...sel], off = btn => { btn.disabled = !n; return btn; };
   b.replaceChildren(el("span", "n", n ? `${n} selecionado${n > 1 ? "s" : ""}` : "Toque nos cards para selecionar"),
@@ -202,6 +203,7 @@ function limparSel() { sel.clear(); ancora = null; modoSel = false; marcarSel();
 function lote(campo, valor) { const ids = [...sel]; limparSel(); editar(ids, campo, valor); }
 function clicarCard(e, id) {
   if (arrastou) { arrastou = false; return; }
+  if (performance.now() < semClique) return;  // clique que o celular solta depois de segurar o dedo
   if (e.target.closest("button,.rs")) return;
   if (e.shiftKey && ancora != null) {  // intervalo na ordem em que os cards aparecem
     const ordem = cardsVisiveis().map(c => +c.dataset.id), a = ordem.indexOf(ancora), b = ordem.indexOf(id);
@@ -372,7 +374,16 @@ function confirmar(titulo, texto, rotulo, fn) {
   document.body.append(v, d); no.focus();
 }
 
-// ---- arrastar: mouse na hora; toque depois de segurar ----
+// ---- arrastar: mouse na hora. Toque: segurar parado liga a seleção; segurar e mover arrasta ----
+// Na lista do celular, soltar em cima de outro card troca os dois de lugar (vale também na grade do PC).
+function trocar(a, b) {
+  const pos = arranjar(gradeAtual), A = gradeAtual.find(i => i.id === a), B = gradeAtual.find(i => i.id === b);
+  if (!A || !B) return;
+  for (const i of gradeAtual) { const p = pos.get(i.id); Object.assign(i, { grade_col: p.col, grade_lin: p.lin }); }  // o resto fica onde está
+  const pa = pos.get(a), pb = pos.get(b);
+  Object.assign(A, { grade_col: pb.col, grade_lin: pb.lin }); Object.assign(B, { grade_col: pa.col, grade_lin: pa.lin });
+  fixarGrade();
+}
 document.addEventListener("touchmove", e => { if (gesto) e.preventDefault(); }, { passive: false });
 function arrastavel(card, it) {
   card.addEventListener("contextmenu", e => { if (matchMedia("(hover:none)").matches) e.preventDefault(); });
@@ -381,7 +392,7 @@ function arrastavel(card, it) {
     if (ini.shiftKey && ini.pointerType === "mouse") return pincel(ini, it.id);  // Shift segurado: seleciona, não move
     const toque = ini.pointerType === "touch", r = card.getBoundingClientRect();
     const grabX = ini.clientX - r.left, grabY = ini.clientY - r.top;
-    let clone = null, alvo = null, ph = null, cel = null, timer = null;
+    let clone = null, alvo = null, ph = null, cel = null, timer = null, segurou = false, antes = null;
     const grid = matchMedia(AREA_GRADE).matches && gradeAtual ? card.closest(".grid") : null, t = tam(it);
 
     const marcar = novo => { if (alvo !== novo) { alvo?.classList.remove("over"); novo?.classList.add("over"); alvo = novo; } };
@@ -394,16 +405,25 @@ function arrastavel(card, it) {
       document.body.style.cursor = "grabbing";
       if (navigator.vibrate && toque) navigator.vibrate(15);
     };
+    const segurar = () => {  // dedo parado: entra no modo Selecionar com este card
+      segurou = gesto = true; fecharMenu();
+      antes = { modo: modoSel, tinha: sel.has(it.id) };
+      modoSel = true; sel.add(it.id); ancora = it.id; marcarSel();
+      if (navigator.vibrate) navigator.vibrate(15);
+    };
     const mover = e => {
       if (!clone) {
         const dist = Math.hypot(e.clientX - ini.clientX, e.clientY - ini.clientY);
-        if (toque) { if (dist > 10) limpar(); return; }  // mexeu antes de segurar: é rolagem
-        if (dist < 5) return;
+        if (toque && !segurou) { if (dist > 10) limpar(); return; }  // mexeu antes de segurar: é rolagem
+        if (dist < (toque ? 10 : 5)) return;
+        if (toque && !antes.tinha) { sel.delete(it.id); modoSel = antes.modo; marcarSel(); }  // segurou para arrastar, não para selecionar
         comecar();
       }
+      if (toque) { if (e.clientY < 70) scrollBy(0, -12); else if (e.clientY > innerHeight - 70) scrollBy(0, 12); }  // ponytail: rola só enquanto o dedo mexe
       clone.style.left = e.clientX - grabX + "px"; clone.style.top = e.clientY - grabY + "px";
       const sob = document.elementFromPoint(e.clientX, e.clientY);
-      marcar(sob?.closest("[data-alvo]") || null);
+      const outro = !grid && gradeAtual && sob?.closest("#vista article.c[data-id]");
+      marcar(sob?.closest("[data-alvo]") || (outro && outro !== card ? outro : null));
       cel = null; ph?.remove(); ph = null;
       if (!alvo && grid) {
         const g = grid.getBoundingClientRect(), largCel = (g.width - GAP * (COLS - 1)) / COLS;
@@ -425,9 +445,11 @@ function arrastavel(card, it) {
     };
     const cancelar = () => limpar();
     const soltar = () => {
-      const a = alvo?.dataset.alvo, c = cel, ativo = !!clone;
+      const a = alvo?.dataset.alvo, troca = alvo?.dataset.id, c = cel, ativo = !!clone;
       limpar();
+      if (segurou) semClique = performance.now() + 300;
       if (!ativo) return;
+      if (troca) return trocar(it.id, +troca);
       arrastou = true; setTimeout(() => { arrastou = false; }, 0);  // o clique que vem depois do soltar não seleciona
       const ids = sel.has(it.id) && sel.size > 1 ? [...sel] : [it.id];
       if (ids.length > 1 && a) limparSel();
@@ -436,7 +458,7 @@ function arrastavel(card, it) {
       else if (c) fixarGrade(c);
     };
     document.addEventListener("pointermove", mover); document.addEventListener("pointerup", soltar); document.addEventListener("pointercancel", cancelar);
-    if (toque) timer = setTimeout(comecar, 300);
+    if (toque) timer = setTimeout(segurar, 350);
   });
 }
 function redimensionavel(alca, card, it, p) {

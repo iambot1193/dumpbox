@@ -408,7 +408,9 @@ try:
         x0, y0 = a["x"] + 40, a["y"] + 10
         toque("touchStart", [{"x": x0, "y": y0}])
         time.sleep(.5)
-        ok(m.locator(".drag").count() == 1, "segurar inicia o arraste no toque")
+        ok(m.locator(".drag").count() == 0 and m.locator("#barra .n").inner_text() == "1 selecionado", "segurar parado liga a seleção")
+        toque("touchMove", [{"x": x0, "y": y0 + 20}]); time.sleep(.05)
+        ok(m.locator(".drag").count() == 1 and m.locator("#vista article.sel").count() == 0, "segurar e mover arrasta (e desfaz a seleção)")
         n = 10
         for i in range(1, n + 1):
             toque("touchMove", [{"x": x0 + (dst["x"] + 30 - x0) * i / n, "y": y0 + (dst["y"] + 20 - y0) * i / n}])
@@ -418,6 +420,36 @@ try:
         toque("touchEnd", [])
         m.wait_for_selector("#toast >> text=foi para Finanças", timeout=4000)
         ok(item(t7)["contexto"] == "financas", "arraste por toque move de pasta")
+
+        # segurar e soltar em cima de outro card: os dois trocam de lugar (ordem da lista e grade salva)
+        m.wait_for_function("!document.querySelector('#barra:not([hidden])')")
+        hs = lambda: m.eval_on_selector_all("#vista article.c h3", "a=>a.map(e=>e.textContent)")
+        ordem = hs()
+        c0 = m.locator("#vista article.c").nth(0).locator(".meta").bounding_box()
+        c2 = m.locator("#vista article.c").nth(2).locator(".meta").bounding_box()
+        x0, y0 = c0["x"] + 40, c0["y"] + 10
+        toque("touchStart", [{"x": x0, "y": y0}]); time.sleep(.5)
+        for i in range(1, 9):
+            toque("touchMove", [{"x": x0, "y": y0 + (c2["y"] + 10 - y0) * i / 8}]); time.sleep(.03)
+        ok("over" in (m.locator("#vista article.c").nth(2).get_attribute("class") or ""), "card de destino acende")
+        m.screenshot(path=SAIDA / "7b-celular-trocar.png")
+        toque("touchEnd", [])
+        m.wait_for_function(f"document.querySelectorAll('#vista article.c h3')[2]?.textContent === {ordem[0]!r}")
+        nova = hs()
+        ok(nova[0] == ordem[2] and nova[2] == ordem[0], f"soltar em cima troca os dois de lugar {nova[:3]}")
+        time.sleep(.4)
+        m.reload(); m.wait_for_selector("h2:text-is('Trabalho')")
+        ok(hs()[:3] == nova[:3], "ordem trocada continua depois de recarregar")
+
+        # segurar um card e tocar em outros: seleciona vários
+        cs = m.locator("#vista article.c")
+        b0 = cs.nth(0).locator(".meta").bounding_box()
+        toque("touchStart", [{"x": b0["x"] + 40, "y": b0["y"] + 10}]); time.sleep(.5); toque("touchEnd", [])
+        time.sleep(.4)
+        ok(m.locator("#barra .n").inner_text() == "1 selecionado", "segurar e soltar mantém o card selecionado")
+        cs.nth(1).locator("h3").tap(); cs.nth(3).locator("h3").tap()
+        ok(m.locator("#barra .n").inner_text() == "3 selecionados", "depois de segurar, toques somam à seleção")
+        m.locator("#barra button.x").tap()
 
         # rolar não deve virar arraste
         a = m.locator("#vista article .meta").first.bounding_box()

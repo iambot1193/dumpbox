@@ -62,6 +62,9 @@ def conectar() -> sqlite3.Connection:
         if "instrucao" not in {r["name"] for r in c.execute("PRAGMA table_info(imagem)")}:  # texto escrito junto com a foto
             c.execute("ALTER TABLE imagem ADD COLUMN instrucao TEXT")
             c.commit()
+        if "repete" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # diario/semanal/mensal: ao concluir, cria a próxima
+            c.execute("ALTER TABLE item ADD COLUMN repete TEXT")
+            c.commit()
         if not c.execute("SELECT 1 FROM pasta LIMIT 1").fetchone():
             c.executemany("INSERT INTO pasta(slug,nome,descricao,ordem,criado_em) VALUES(?,?,?,?,?)",
                           [(s, n, d, i, agora()) for i, (s, n, d) in enumerate(PADRAO)])

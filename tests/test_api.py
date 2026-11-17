@@ -515,6 +515,7 @@ def test_rate_limit_e_token():
 def test_celular_conectado_por_token():
     """App do GitHub Pages (outra origem): login devolve token, que vale como Bearer; CORS só para a origem do Pages."""
     pages = {"Origin": "https://iambot1193.github.io"}
+    auth._tentativas.clear()  # limite de logins por IP vale para o processo todo
     c = TestClient(api.app)
     tok = c.post("/api/login", json={"senha": "senha-certa"}, headers=pages).json()["token"]
     c.cookies.clear()  # o celular não manda cookie para outra origem
@@ -533,6 +534,43 @@ def test_celular_conectado_por_token():
                headers={"Authorization": f"Bearer {tok}"})
     it = next(i for i in c.get("/api/itens", headers={"Authorization": f"Bearer {tok}"}).json()["itens"] if i["id"] == r.json()["id"])
     assert it["prazo_em"] == "2027-03-04T09:30"
+
+
+def test_repete_e_copia():
+    """Tarefa que se repete: concluir cria a próxima; Desfazer reabre a antiga e manda a nova para a Lixeira."""
+    from dumpbox.chat import proxima
+    auth._tentativas.clear()  # limite de logins por IP vale para o processo todo
+    agora = datetime(2026, 1, 31, 9)
+    assert proxima("2026-01-31", "mensal", agora) == "2026-02-28"  # mês curto: último dia
+    assert proxima("2026-12-15T08:30", "mensal", agora) == "2027-01-15T08:30"
+    assert proxima("2026-03-01T10:00", "semanal", agora) == "2026-03-08T10:00"
+    assert proxima(None, "diario", agora) == "2026-02-01"
+    c = TestClient(api.app)
+    assert c.post("/api/login", json={"senha": "senha-certa"}).status_code == 200
+    iid = c.post("/api/itens", json={"titulo": "Pagar aluguel", "contexto": "casa", "prazo": "2026-12-05", "repete": "mensal"}).json()["id"]
+    lista = lambda: c.get("/api/itens").json()
+    r = c.post("/api/itens/editar", json={"ids": [iid], "campo": "estado", "valor": "feito"}).json()
+    proximas = [i for i in lista()["itens"] if i["titulo"] == "Pagar aluguel" and i["estado"] == "catalogado"]
+    assert len(proximas) == 1 and proximas[0]["prazo_em"] == "2027-01-05" and proximas[0]["repete"] == "mensal"
+    antiga = next(i for i in lista()["itens"] if i["id"] == iid)
+    assert antiga["estado"] == "feito" and antiga["repete"] is None  # reabrir e concluir de novo não duplica
+    c.post("/api/desfazer", json={"grupo": r["grupo"]})
+    antiga = next(i for i in lista()["itens"] if i["id"] == iid)
+    assert antiga["estado"] == "catalogado" and antiga["repete"] == "mensal"
+    assert any(i["id"] == proximas[0]["id"] for i in lista()["lixeira"])
+    # repete pelo Editar do card, junto com outro campo, um Desfazer só
+    r = c.post(f"/api/itens/{iid}/editar", json={"mudancas": {"repete": "", "titulo": "Pagar aluguel!"}}).json()
+    assert r["n"] == 2 and next(i for i in lista()["itens"] if i["id"] == iid)["repete"] is None
+    assert c.post(f"/api/itens/{iid}/editar", json={"mudancas": {"repete": "anual"}}).status_code == 422
+    # cópia para o celular pela tela do PC
+    r = c.get("/api/copia")
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    assert any(i["titulo"] == "Pagar aluguel!" for i in r.json()["itens"]) and r.json()["dumpbox"] == 1
+    b = db.conectar()  # limpa: os outros testes contam itens e Lixeira
+    ids = [x[0] for x in b.execute("SELECT id FROM item WHERE titulo LIKE 'Pagar aluguel%'")]
+    b.executemany("DELETE FROM alteracao WHERE item_id=?", [(i,) for i in ids])
+    b.executemany("DELETE FROM item WHERE id=?", [(i,) for i in ids])
+    b.commit()
 
 
 def test_nota_offline_usa_hora_da_escrita():
@@ -621,6 +659,7 @@ def test_backup_diario():
 if __name__ == "__main__":
     test_fluxo()
     test_celular_conectado_por_token()
+    test_repete_e_copia()
     test_backup_diario()
     test_foto_de_lista()
     test_nota_offline_usa_hora_da_escrita()

@@ -1,5 +1,6 @@
 """API + PWA. Rodar: uvicorn dumpbox.api:app --host 127.0.0.1 --port 8000 (expor só via Tailscale)."""
 import base64
+import json
 import os
 import re
 import sys
@@ -16,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, chat, classifier, db, editor, ollama_mgr, rules, setup, visao
+from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, visao
 from .schema import Tipo
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
@@ -117,6 +118,7 @@ class NovoItem(BaseModel):
     tipo: Tipo = "tarefa"
     prioridade: chat.Prioridade | None = None  # None = regra pelo prazo
     prazo: str | None = Field(default=None, max_length=60)  # texto livre ("sexta 14h"), resolvido por regra
+    repete: Literal["", "diario", "semanal", "mensal"] | None = None
 
 
 class Posicao(BaseModel):
@@ -252,20 +254,27 @@ def editar_itens(body: Edicao, c=Depends(conexao)):
 
 
 class EdicaoCard(BaseModel):
-    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo"], str] = Field(min_length=1)
+    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete"], str] = Field(min_length=1)
 
 
 @app.post("/api/itens/{item_id}/editar", dependencies=[Depends(exige_login)])
 def editar_card(item_id: int, body: EdicaoCard, c=Depends(conexao)):
     """Botão Editar do card: vários campos de um item, tudo ou nada, um Desfazer."""
-    validas = []
+    validas, repete = [], body.mudancas.pop("repete", None)
+    if repete is not None and repete not in ("", *chat.REPETE):
+        raise HTTPException(422, "repete: use diario, semanal ou mensal")
     for campo, valor in body.mudancas.items():
         try:
             validas.append(chat.validar(c, chat.Acao(tipo=campo, item_id=item_id, valor=valor), datetime.now())[0])
         except ValueError as e:
             raise HTTPException(404 if "inexistente" in str(e) else 422, f"{campo}: {e}")
     grupo = str(uuid.uuid4())
+    if repete is not None and not c.execute("SELECT 1 FROM item WHERE id=?", (item_id,)).fetchone():
+        raise HTTPException(404, "item inexistente")
     n = sum(chat.aplicar(c, a, grupo) for a in validas)
+    if repete is not None:
+        n += chat._mudar(c, item_id, "repete", repete or None, grupo, None)
+        c.commit()
     if not n:
         return {"grupo": None, "descricao": None, "n": 0}
     titulo = c.execute("SELECT titulo FROM item WHERE id=?", (item_id,)).fetchone()["titulo"]
@@ -291,10 +300,10 @@ def criar_item(body: NovoItem, c=Depends(conexao)):
     cid = str(uuid.uuid4())
     db.nova_captura(c, cid, titulo, "manual")
     c.execute("UPDATE captura SET status='ok' WHERE id=?", (cid,))
-    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em) "
-                    "VALUES(?,?,?,?,?,?,?,'[]',?)",
+    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em,repete) "
+                    "VALUES(?,?,?,?,?,?,?,'[]',?,?)",
                     (cid, body.tipo, titulo, pasta, texto_prazo or None, prazo_em,
-                     body.prioridade or rules.prioridade(prazo_em, titulo, agora), db.agora())).lastrowid
+                     body.prioridade or rules.prioridade(prazo_em, titulo, agora), db.agora(), body.repete or None)).lastrowid
     c.commit()
     return {"id": iid, "descricao": f"“{titulo}” criado em {db.nome_pasta(pasta)}"}
 
@@ -306,6 +315,14 @@ class NovaPasta(BaseModel):
 
 class ApagaPasta(BaseModel):
     destino: str = Field(min_length=1, max_length=40)  # slug de outra pasta, ou "lixeira"
+
+
+@app.get("/api/copia", dependencies=[Depends(exige_login)])
+def baixar_copia():
+    """Botão "Cópia para o celular": o mesmo arquivo do `python -m dumpbox.exportar`, para importar no modo celular."""
+    d = exportar.copia()
+    return Response(json.dumps(d, ensure_ascii=False), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="copia-celular-{d["exportado_em"][:10]}.json"'})
 
 
 @app.post("/api/pastas", dependencies=[Depends(exige_login)])

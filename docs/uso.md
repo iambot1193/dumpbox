@@ -96,3 +96,11 @@ As mudanças são aplicadas na hora e têm Desfazer. A IA nunca apaga de vez e s
 3. No navegador do celular: menu → **Adicionar à tela inicial**. Vira um app.
 
 Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os itens.
+
+## Atalhos novos (17/11/2026)
+- **Celular, gestos no card:** segurar parado liga a seleção (toques seguintes somam); segurar e mover arrasta: solte sobre outro card para trocar os dois de lugar, ou sobre uma pasta para mover. Deslizar para a direita conclui (ou reabre, se já estava feito).
+- **Compartilhar para o dumpbox (Android, app instalado):** no menu Compartilhar de qualquer app, escolha dumpbox; o texto/link chega na caixa de nota para você conferir e Guardar. Segurar o ícone do app mostra o atalho "Nova nota".
+- **Ditar:** botão do microfone ao lado da câmera. No Chrome, o áudio vai para o serviço de voz do Google (é a única parte que sai do aparelho).
+- **Busca:** campo abaixo da caixa de nota; procura em todas as pastas, sem diferenciar acento e maiúscula. Trocar de pasta limpa a busca.
+- **Repetir:** no Nova/Editar, "Repetir" todo dia, toda semana ou todo mês. Ao concluir, a próxima é criada com o prazo seguinte (mês curto usa o último dia). O Desfazer reabre a antiga e manda a nova para a Lixeira.
+- **Cópia para o celular:** botão "cópia p/ celular" na lateral (só no PC) baixa o arquivo para Importar cópia no modo celular.

@@ -19,6 +19,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path[:0] = [p for p in (os.getenv("DUMPBOX_PW_PATH"), str(RAIZ / "backend")) if p]
 os.environ.update(DUMPBOX_HOME=tempfile.mkdtemp(prefix="dumpbox_local_"), DUMPBOX_WORKER="0", DUMPBOX_SECRET="teste-local", DUMPBOX_NO_BROWSER="1")
 from dumpbox import auth, db  # noqa: E402
+from dumpbox.chat import proxima  # noqa: E402
 from dumpbox.rules import resolver_prazo  # noqa: E402
 os.environ["DUMPBOX_PASSWORD_HASH"] = auth.hash_senha("senha-de-teste")
 from playwright.sync_api import sync_playwright  # noqa: E402
@@ -80,6 +81,33 @@ with sync_playwright() as p:
     ok(it["estado"] == "catalogado", "Desfazer volta e tudo continua depois de recarregar")
     ok(g.evaluate(api, ["/api/pastas", {"nome": "Projetos pessoais"}])[1]["slug"] == "projetos_pessoais", "cria pasta")
 
+    # repetição no aparelho: concluir cria a próxima, igual ao chat.proxima; Desfazer volta
+    for prazo_txt, rep in [("dia 30", "mensal"), ("sexta 14h", "semanal"), ("amanhã", "diario")]:
+        st, r = g.evaluate(api, ["/api/itens", {"titulo": f"Rep {rep}", "contexto": "casa", "tipo": "tarefa", "prazo": prazo_txt, "repete": rep}])
+        base = next(i for i in g.evaluate(api, ["/api/itens", None])[1]["itens"] if i["id"] == r["id"])
+        st, e = g.evaluate(api, ["/api/itens/editar", {"ids": [r["id"]], "campo": "estado", "valor": "feito"}])
+        its = g.evaluate(api, ["/api/itens", None])[1]["itens"]
+        nova = [i for i in its if i["titulo"] == f"Rep {rep}" and i["estado"] == "catalogado"]
+        ok(len(nova) == 1 and nova[0]["prazo_em"] == proxima(base["prazo_em"], rep, datetime.now()) and nova[0]["repete"] == rep,
+           f"repete {rep}: próxima {nova[0]['prazo_em'] if nova else None} igual ao chat.proxima")
+        g.evaluate(api, ["/api/desfazer", {"grupo": e["grupo"]}])
+        its = g.evaluate(api, ["/api/itens", None])[1]
+        ok(next(i for i in its["itens"] if i["id"] == r["id"])["repete"] == rep and any(i["titulo"] == f"Rep {rep}" for i in its["lixeira"]),
+           f"repete {rep}: Desfazer reabre e manda a próxima para a Lixeira")
+
+    # busca em todas as pastas, sem acento
+    g.fill("#busca", "PILHAS")
+    g.wait_for_selector("h2:text-is('Busca')")
+    ok(g.locator("#vista article.c h3").all_inner_texts() == ["comprar pilhas"], "busca acha em qualquer pasta, sem diferenciar maiúscula")
+    g.fill("#busca", "")
+    g.wait_for_selector("h2:not(:text-is('Busca'))")
+
+    # compartilhar para o dumpbox: o texto chega na caixa de nota
+    g.goto(URL + "&title=Video&text=olha%20isso&url=https%3A%2F%2Fexemplo.com")
+    g.wait_for_selector("#nav .fold")
+    ok(g.input_value("#txt") == "Video\nolha isso\nhttps://exemplo.com" and "text=" not in g.url and "local=1" in g.url, "compartilhado entra na caixa e sai da URL")
+    g.fill("#txt", "")
+
     ok(g.evaluate("navigator.serviceWorker.ready.then(r => r.scope)").endswith("/web/"), "service worker no subcaminho (funciona offline)")
     g.context.set_offline(True)
     g.reload()
@@ -125,7 +153,8 @@ with sync_playwright() as p:
     ok(cap and cap[0] == "comprar pilhas\nAA e AAA","nota intacta vai para a IA do PC (texto completo)")
     ok(tarefa and tuple(tarefa) == ("financas", resolver_prazo("semana que vem", datetime.now())), "tarefa editada vai com pasta e prazo")
     ok(not c.execute("SELECT 1 FROM item WHERE titulo LIKE 'Item do PC%'").fetchone(), "cópia do PC não volta para o PC")
-    ok([i["titulo"] for i in g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens")] == ["Item do PC 1", "Item do PC 2"], "só a cópia fica no aparelho")
+    ok([i["titulo"] for i in g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens") if i["estado"] == "catalogado"] == ["Item do PC 1", "Item do PC 2"],
+       "dos abertos, só a cópia fica no aparelho (feitos e Lixeira não sobem)")
     ok(g.evaluate("!!localStorage['dumpbox.token']") and g.locator("#fab").is_visible(), "conectado: token salvo, chat da IA aparece")
     g.reload()
     g.wait_for_selector("#nav .fold")

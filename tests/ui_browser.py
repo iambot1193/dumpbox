@@ -379,6 +379,18 @@ try:
         g.click('[data-alvo="outro"]'); g.wait_for_selector("h2:text-is('Outro')")
         ok(g.locator("button", has_text="Apagar pasta").count() == 0, "Outro não tem Apagar pasta")
         ok(g.evaluate("document.documentElement.scrollWidth<=innerWidth"), "sem rolagem horizontal no PC")
+        # cópia para o celular pela tela do PC; ditado e busca
+        with g.expect_download() as dl:
+            g.click("#nav button:has-text('cópia p/ celular')")
+        ok(dl.value.suggested_filename.startswith("copia-celular-") and json.loads(Path(dl.value.path()).read_text(encoding="utf-8"))["dumpbox"] == 1,
+           "botão baixa a cópia para o celular")
+        ok(g.locator("#voz").is_visible(), "botão de ditado (Chrome tem reconhecimento de voz)")
+        g.fill("#busca", "reuniao")
+        g.wait_for_selector("h2:text-is('Busca')")
+        ok(g.locator("#vista article.c h3").all_inner_texts() == ["Reunião de alinhamento"], "busca sem acento acha “Reunião”")
+        g.click('[data-alvo="casa"]')
+        ok(g.input_value("#busca") == "" and g.locator("h2:text-is('Casa')").count() == 1, "trocar de pasta limpa a busca")
+
         ok(erros == [], f"console limpo {erros}")
         ctx.close()
 
@@ -450,6 +462,20 @@ try:
         cs.nth(1).locator("h3").tap(); cs.nth(3).locator("h3").tap()
         ok(m.locator("#barra .n").inner_text() == "3 selecionados", "depois de segurar, toques somam à seleção")
         m.locator("#barra button.x").tap()
+
+        # deslizar o card para a direita conclui (sem esperar segurar)
+        cs = m.locator("#vista article.c")
+        tz = cs.nth(0).locator("h3").inner_text()
+        bz = cs.nth(0).locator(".meta").bounding_box()
+        xz, yz = bz["x"] + 20, bz["y"] + 10
+        toque("touchStart", [{"x": xz, "y": yz}])
+        for i in range(1, 7):
+            toque("touchMove", [{"x": xz + 30 * i, "y": yz + 2}]); time.sleep(.02)
+        ok("desliza" in (cs.nth(0).get_attribute("class") or ""), "card acompanha o dedo ao deslizar")
+        toque("touchEnd", [])
+        m.wait_for_selector("#toast >> text=marcado como feito", timeout=4000)
+        ok(item(tz)["estado"] == "feito", "deslizar para a direita marca como feito")
+        ok(m.locator("#barra").is_hidden(), "deslizar não liga a seleção")
 
         # rolar não deve virar arraste
         a = m.locator("#vista article .meta").first.bounding_box()

@@ -5,6 +5,7 @@ apenas arquiva e cada mudança vai para o diário `alteracao` (botão Desfazer).
 Texto de nota é dado não confiável: ações são de um conjunto fechado, ids/valores são validados aqui e o item
 precisa ter sido citado pelo usuário.
 """
+import calendar
 import difflib
 import re
 import uuid
@@ -22,7 +23,8 @@ from .schema import Tipo
 Prioridade = Literal["critica", "alta", "media", "baixa"]
 _DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 _COLUNA = {"estado": "estado", "prazo": "prazo_em", "contexto": "contexto", "prioridade": "prioridade",
-           "titulo": "titulo", "tipo": "tipo"}  # whitelist: nome de coluna nunca vem do modelo
+           "titulo": "titulo", "tipo": "tipo", "repete": "repete"}  # whitelist: nome de coluna nunca vem do modelo
+REPETE = {"diario": "todo dia", "semanal": "toda semana", "mensal": "todo mês"}
 _NIVEL = {"critica": "crítica", "alta": "alta", "media": "média", "baixa": "baixa"}
 _EXCLUIR = {"excluido", "excluído", "apagado", "deletado", "removido", "excluir", "apagar"}  # viram "arquivado"
 
@@ -169,6 +171,8 @@ def _frase(campo: str, titulo: str, antes: str | None, depois: str) -> str:
         return f"“{titulo}” " + {"arquivado": "foi para a Lixeira", "feito": "marcado como feito"}.get(depois, "voltou para a pasta")
     if campo == "prioridade":
         return f"“{titulo}” agora é {_NIVEL.get(depois, depois)}"
+    if campo == "repete":
+        return f"“{titulo}” " + (f"repete {REPETE[depois]}" if depois else "não repete mais")
     return f"{campo} de “{titulo}”: {antes or '-'} → {depois}"
 
 
@@ -205,8 +209,39 @@ def aplicar(c, a: Acao, grupo: str, captura_id: str | None = None) -> int:
         n = sum(_mudar(c, i, "estado", "arquivado", grupo, captura_id) for i in duplicados(c))
     else:
         n = int(_mudar(c, a.item_id, a.tipo, a.valor, grupo, captura_id))
+        if n and a.tipo == "estado" and a.valor == "feito":
+            _repetir(c, a.item_id, grupo)
     c.commit()
     return n
+
+
+def proxima(prazo_em: str | None, repete: str, agora: datetime) -> str:
+    """Próximo prazo de uma tarefa que se repete: a partir do prazo dela (ou de hoje), mantendo a hora."""
+    base = datetime.fromisoformat(prazo_em) if prazo_em else agora.replace(hour=0, minute=0, second=0, microsecond=0)
+    if repete == "mensal":
+        mes = base.month % 12 + 1
+        ano = base.year + (base.month == 12)
+        dia = min(base.day, calendar.monthrange(ano, mes)[1])
+        nova = base.replace(year=ano, month=mes, day=dia)
+    else:
+        nova = base + timedelta(days=1 if repete == "diario" else 7)
+    return nova.strftime("%Y-%m-%dT%H:%M" if prazo_em and "T" in prazo_em else "%Y-%m-%d")
+
+
+def _repetir(c, item_id: int, grupo: str) -> None:
+    """Concluiu uma tarefa que se repete: cria a próxima e tira a repetição da concluída (as duas no diário:
+    o Desfazer reabre a antiga e manda a nova para a Lixeira)."""
+    it = c.execute("SELECT * FROM item WHERE id=?", (item_id,)).fetchone()
+    if not it["repete"] or it["repete"] not in REPETE:
+        return
+    prazo = proxima(it["prazo_em"], it["repete"], datetime.now())
+    novo = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_em,prioridade,tags,estado,criado_em,repete) "
+                     "VALUES(?,?,?,?,?,?,?,'catalogado',?,?)",
+                     (it["captura_id"], it["tipo"], it["titulo"], it["contexto"], prazo, it["prioridade"], it["tags"] or "[]",
+                      db.agora(), it["repete"])).lastrowid
+    c.execute("INSERT INTO alteracao(grupo,item_id,campo,antes,depois,descricao,criado_em) VALUES(?,?,'estado','arquivado','catalogado',?,?)",
+              (grupo, novo, f"Próxima “{it['titulo']}” para {prazo.replace('T', ' ')}", db.agora()))
+    _mudar(c, item_id, "repete", None, grupo, None)
 
 
 def desfazer(c, grupo: str) -> int:

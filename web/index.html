@@ -49,6 +49,8 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .cin textarea::placeholder{color:var(--mute)}
 #guardar{background:var(--sig);color:var(--ink);font-weight:700;padding:0 24px;flex-direction:column;justify-content:center;gap:1px}
 #guardar small{font:12px var(--mono)}
+#voz{display:flex;align-items:center;justify-content:center;width:52px;background:none;border:0;border-left:1px solid var(--line);color:var(--mute);cursor:pointer}#voz .i{width:24px;height:24px}#voz.on{color:var(--ink);background:var(--sig)}
+#busca{display:block;width:100%;margin:8px 0 0;background:var(--panel);border:1px solid var(--line);color:var(--txt);font:14px var(--mono);padding:8px 10px;outline:0}#busca:focus{border-color:var(--txt)}
 #foto{position:relative;display:flex;align-items:center;justify-content:center;width:52px;color:var(--mute);cursor:pointer;border-left:1px solid var(--line)}
 #foto:hover,#foto:focus-within{color:var(--txt)}#foto .i{width:24px;height:24px}
 #foto input{position:absolute;width:1px;height:1px;opacity:0}
@@ -175,7 +177,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
   .hd{margin:9px 0 7px;gap:4px 8px}.hd h2{font-size:30px}.hd>span{font-size:13px}.ctl{margin-left:0;width:100%;font-size:12px}
   .ft button{padding:7px 6px}
   .grid{display:flex;flex-direction:column;gap:8px}
-  .c{padding:8px 10px 4px;overflow:visible}.c h3,.c.w2 h3{font-size:18px;margin:2px 0 4px;-webkit-line-clamp:unset}.c.alta h3,.c.critica h3{font-size:22px;font-weight:700}
+  .c{padding:8px 10px 4px;overflow:visible;touch-action:pan-y}.c.desliza{transition:none;background:#1f3324}.c h3,.c.w2 h3{font-size:18px;margin:2px 0 4px;-webkit-line-clamp:unset}.c.alta h3,.c.critica h3{font-size:22px;font-weight:700}
   .sig{padding:8px 0 8px 10px}
   #toast{left:78px;right:8px;bottom:70px;max-width:none}
   #barra{left:78px;right:8px;bottom:70px;max-width:none}#barra button{min-height:44px;padding:0 8px}
@@ -206,6 +208,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <symbol id="move" viewBox="0 0 24 24"><path d="M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4"/></symbol>
 <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></symbol>
 <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
 <symbol id="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
 </defs></svg>
 <div id="prep" hidden></div>
@@ -224,7 +227,8 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <section id="app" hidden>
   <nav id="nav"></nav>
   <main>
-    <div class="cin"><b>&gt;</b><div id="anexo" hidden><img alt="Foto anexada"><button aria-label="Tirar a foto" title="Tirar a foto">✕</button></div><textarea id="txt" rows="2" aria-label="Nova nota" placeholder="Despeje tudo aqui, solto, misturado…"></textarea><label id="foto" title="Foto ou print de uma lista (ou Ctrl+V de um print): cada linha vira item"><svg class="i"><use href="#camera"/></svg><input type="file" accept="image/*" aria-label="Enviar foto de lista"></label><button id="guardar">Guardar<small>Ctrl+Enter</small></button></div>
+    <div class="cin"><b>&gt;</b><div id="anexo" hidden><img alt="Foto anexada"><button aria-label="Tirar a foto" title="Tirar a foto">✕</button></div><textarea id="txt" rows="2" aria-label="Nova nota" placeholder="Despeje tudo aqui, solto, misturado…"></textarea><label id="foto" title="Foto ou print de uma lista (ou Ctrl+V de um print): cada linha vira item"><svg class="i"><use href="#camera"/></svg><input type="file" accept="image/*" aria-label="Enviar foto de lista"></label><button id="voz" title="Ditar por voz (o Chrome usa o serviço de voz do Google)" aria-label="Ditar por voz"><svg class="i"><use href="#mic"/></svg></button><button id="guardar">Guardar<small>Ctrl+Enter</small></button></div>
+    <input id="busca" type="search" placeholder="Buscar em todas as pastas…" aria-label="Buscar nos cards" autocomplete="off">
     <div id="st" class="fila"></div>
     <div id="vista"></div>
   </main>

@@ -98,6 +98,8 @@ function txtPrazo(p) {
   const nome = n === 0 ? "hoje" : n === 1 ? "amanhã" : n > 1 && n < 7 ? SEMANA[new Date(a, m - 1, d).getDay()] : `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
   return hora ? `${nome}, ${hora}` : nome;
 }
+const REPETE = { diario: "todo dia", semanal: "toda semana", mensal: "todo mês" };
+const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const aberto = i => i.estado !== "feito";
 const atrasado = i => aberto(i) && i.prazo_em && dias(i.prazo_em) < 0;
 const pasta = i => NOME[i.contexto] ? i.contexto : "outro";  // pasta apagada ou desconhecida: Outro
@@ -297,6 +299,7 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
   const crit = opcoes(el("select"), it ? NIVEIS.map(([v, n]) => [v, n]) : [["", "automática"], ...NIVEIS.map(([v, n]) => [v, n])], it?.prioridade || "");
   const prazo = el("input"); prazo.maxLength = 60; prazo.placeholder = it?.prazo_em ? `${txtPrazo(it.prazo_em)} (vazio = manter)` : "ex.: sexta 14h, amanhã, dia 20";
   prazo.value = !it && vista === "hoje" ? "hoje" : "";
+  const rep = opcoes(el("select"), [["", "não repete"], ...Object.entries(REPETE)], it?.repete || "");
   if (it) titulo.value = it.titulo || "";
   const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
   no.type = "button"; no.onclick = fim; v.onclick = fim;
@@ -305,8 +308,8 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
     e.preventDefault(); si.disabled = true;
     try {
       if (it) {
-        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazo.value.trim() };
-        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: "" };
+        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazo.value.trim(), repete: rep.value };
+        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: "", repete: it.repete };
         for (const k in m) if (m[k] === (antes[k] || "")) delete m[k];
         if (Object.keys(m).length) {
           const r = await api(`/api/itens/${it.id}/editar`, { mudancas: m });
@@ -314,14 +317,14 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
         }
         fim(); ultimo = ""; return atualizar();
       }
-      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazo.value || null });
+      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazo.value || null, repete: rep.value || null });
       fim(); toast(r.descricao); ultimo = ""; atualizar();
     } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
   const linha2 = el("div", "duas"); linha2.append(campo("Pasta", pastaS), campo("Tipo", tipo));
   const linha3 = el("div", "duas"); linha3.append(campo("Prazo", prazo), campo("Criticidade", crit));
   pe.append(no, si);
-  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), linha2, linha3, erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), linha2, linha3, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----
@@ -392,7 +395,7 @@ function arrastavel(card, it) {
     if (ini.shiftKey && ini.pointerType === "mouse") return pincel(ini, it.id);  // Shift segurado: seleciona, não move
     const toque = ini.pointerType === "touch", r = card.getBoundingClientRect();
     const grabX = ini.clientX - r.left, grabY = ini.clientY - r.top;
-    let clone = null, alvo = null, ph = null, cel = null, timer = null, segurou = false, antes = null;
+    let clone = null, alvo = null, ph = null, cel = null, timer = null, segurou = false, antes = null, desliza = false, dx = 0;
     const grid = matchMedia(AREA_GRADE).matches && gradeAtual ? card.closest(".grid") : null, t = tam(it);
 
     const marcar = novo => { if (alvo !== novo) { alvo?.classList.remove("over"); novo?.classList.add("over"); alvo = novo; } };
@@ -414,7 +417,14 @@ function arrastavel(card, it) {
     const mover = e => {
       if (!clone) {
         const dist = Math.hypot(e.clientX - ini.clientX, e.clientY - ini.clientY);
-        if (toque && !segurou) { if (dist > 10) limpar(); return; }  // mexeu antes de segurar: é rolagem
+        if (toque && !segurou) {
+          dx = e.clientX - ini.clientX;
+          // deslizar para a direita (antes de segurar) conclui ou reabre o card
+          if (!desliza && dx > 12 && dx > Math.abs(e.clientY - ini.clientY) * 1.5) { desliza = gesto = true; clearTimeout(timer); card.classList.add("desliza"); }
+          if (desliza) { card.style.transform = `translateX(${Math.max(0, dx)}px)`; return; }
+          if (dist > 10) limpar();  // mexeu antes de segurar: é rolagem
+          return;
+        }
         if (dist < (toque ? 10 : 5)) return;
         if (toque && !antes.tinha) { sel.delete(it.id); modoSel = antes.modo; marcarSel(); }  // segurou para arrastar, não para selecionar
         comecar();
@@ -439,7 +449,7 @@ function arrastavel(card, it) {
     const limpar = () => {
       clearTimeout(timer);
       document.removeEventListener("pointermove", mover); document.removeEventListener("pointerup", soltar); document.removeEventListener("pointercancel", cancelar);
-      clone?.remove(); ph?.remove(); alvo?.classList.remove("over"); card.classList.remove("saiu");
+      clone?.remove(); ph?.remove(); alvo?.classList.remove("over"); card.classList.remove("saiu", "desliza"); card.style.transform = "";
       document.body.style.cursor = "";
       gesto = false;
     };
@@ -447,7 +457,8 @@ function arrastavel(card, it) {
     const soltar = () => {
       const a = alvo?.dataset.alvo, troca = alvo?.dataset.id, c = cel, ativo = !!clone;
       limpar();
-      if (segurou) semClique = performance.now() + 300;
+      if (segurou || desliza) semClique = performance.now() + 300;
+      if (desliza) { if (dx > Math.min(110, r.width * .35)) editar(it.id, "estado", aberto(it) ? "feito" : "catalogado"); return; }
       if (!ativo) return;
       if (troca) return trocar(it.id, +troca);
       arrastou = true; setTimeout(() => { arrastou = false; }, 0);  // o clique que vem depois do soltar não seleciona
@@ -520,6 +531,7 @@ function cartao(it, comPasta) {
   } else if (it.prazo_em) {
     const d = el("div", "due"); d.append(ic("clock"), txtPrazo(it.prazo_em)); a.append(d);
   }
+  if (REPETE[it.repete]) { const d = el("div", "due"); d.append(ic("retry"), REPETE[it.repete]); a.append(d); }
   const acts = el("div", "acts"), dir = el("div");
   const feito = aberto(it);
   dir.append(botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)), botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
@@ -613,7 +625,18 @@ function vLixeira(v) {
   }
   v.append(g);
 }
-function ir(v) { vista = v; filtro = null; sel.clear(); ancora = null; modoSel = false; try { localStorage.setItem(VISTA, v); } catch {} render(); scrollTo(0, 0); }
+function vBusca(v) {  // todas as palavras, sem acento, em qualquer pasta; feitos no fim
+  const ps = norm($("busca").value).split(/\s+/).filter(Boolean);
+  const l = D.itens.filter(i => { const t = norm(`${i.titulo} ${NOME[pasta(i)] || ""} ${i.tipo}`); return ps.every(p => t.includes(p)); })
+    .sort((a, b) => aberto(b) - aberto(a) || urgencia(a, b));
+  v.append(cabecalho("Busca", `${l.length} ite${l.length === 1 ? "m" : "ns"} para “${$("busca").value.trim()}”`));
+  if (!l.length) return v.append(el("p", "vazio", "Nada encontrado."));
+  const g = el("div", "grid");
+  for (const i of l) { const c = cartao(i, true); c.style.gridColumn = "span 1"; c.style.setProperty("--l", 2); g.append(c); }
+  v.append(g);
+}
+$("busca").addEventListener("input", () => { sel.clear(); render(); });
+function ir(v) { $("busca").value = ""; vista = v; filtro = null; sel.clear(); ancora = null; modoSel = false; try { localStorage.setItem(VISTA, v); } catch {} render(); scrollTo(0, 0); }
 function desenhaNav() {
   const abertos = D.itens.filter(aberto), base = abertos.filter(i => i.prazo_em && dias(i.prazo_em) <= 0), atras = base.filter(atrasado).length;
   const linha = (id, conteudo, n, alvo) => {
@@ -630,6 +653,7 @@ function desenhaNav() {
   const fim = el("div", "fim");
   fim.append(linha("revisar", [ic("alert"), "Revisar"], D.revisar.filter(c => c.status === "falhou").length),
     linha("lixeira", [ic("trash"), "Lixeira"], D.lixeira.length, true),
+    ...(window.DUMPBOX_LOCAL ? [] : [botao("sair", ["cópia p/ celular"], "Baixar cópia para importar no app do celular", () => { location.href = "api/copia"; })]),
     botao("sair", ["sair"], null, async () => { await api("/api/logout", {}); mostra("login"); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,
     ...PASTAS.map(([p, n]) => linha(p, [n], abertos.filter(i => pasta(i) === p).length, true)),
@@ -639,7 +663,8 @@ function render() {
   gradeAtual = null;
   desenhaNav();
   const v = $("vista"); v.replaceChildren();
-  if (vista === "hoje") vHoje(v);
+  if (norm($("busca").value).trim()) vBusca(v);
+  else if (vista === "hoje") vHoje(v);
   else if (vista === "revisar") vRevisar(v);
   else if (vista === "lixeira") vLixeira(v);
   else if (NOME[vista]) vPasta(v);
@@ -681,6 +706,34 @@ $("guardar").onclick = async () => {
   if (anexo) toast("Foto enviada: a IA lê a lista e cria os itens (pode levar 1 min).");
   $("txt").value = ""; anexar(null); crescer(); await enviarFila(); atualizar();
 };
+
+// ditado: reconhecimento de voz do próprio navegador (Chrome manda o áudio para o serviço do Google)
+const Voz = window.SpeechRecognition || window.webkitSpeechRecognition;
+let ouvindo = null;
+$("voz").hidden = !Voz;
+$("voz").onclick = () => {
+  if (ouvindo) return ouvindo.stop();
+  const r = ouvindo = new Voz();
+  r.lang = "pt-BR"; r.interimResults = false; r.continuous = false;
+  r.onresult = e => {
+    const fala = [...e.results].map(x => x[0].transcript).join(" ").trim(), t = $("txt");
+    if (fala) { t.value = t.value.trim() ? `${t.value.trimEnd()}\n${fala}` : fala; crescer(); }
+  };
+  r.onerror = e => { if (e.error !== "aborted" && e.error !== "no-speech") toast(e.error === "not-allowed" ? "Libere o microfone para ditar." : "Não consegui ouvir. Tente de novo."); };
+  r.onend = () => { ouvindo = null; $("voz").classList.remove("on"); };
+  $("voz").classList.add("on"); r.start();
+};
+
+// compartilhar para o dumpbox (Android: menu Compartilhar) e atalho "Nova nota" do ícone: preenchem a caixa
+{
+  const q = new URLSearchParams(location.search), veio = [...new Set(["title", "text", "url"].map(k => q.get(k)).filter(Boolean))];
+  if (veio.length || q.has("nova")) {
+    if (veio.length) { $("txt").value = veio.join("\n"); crescer(); }
+    ["title", "text", "url", "nova"].forEach(k => q.delete(k));
+    history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : ""));
+    setTimeout(() => $("txt").focus(), 300);
+  }
+}
 
 // foto de lista: reduz no navegador (lado maior 1280 px, JPEG) e entra na mesma fila das notas
 async function reduzir(arq) {

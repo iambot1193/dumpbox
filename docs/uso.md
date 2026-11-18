@@ -106,7 +106,7 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Cópia para o celular:** botão "cópia p/ celular" na lateral (só no PC) baixa o arquivo para Importar cópia no modo celular.
 
 ## Novidades (18/11/2026)
-- **Tutorial:** abre no 1º acesso; depois pelo "ajuda" da lateral.
+- **Tutorial guiado:** abre no 1º acesso (depois pelo "ajuda" da lateral). Destaca a parte da tela e espera você fazer (guardar uma nota, criar pelo +, concluir); "Pular passo" segue sem fazer. A tela continua usável durante o tutorial.
 - **Texto do card:** campo abaixo do título no Nova/Editar; aparece no card e entra na busca.
 - **Prazo pelo calendário:** dia e hora (opcional) no Nova/Editar; o campo escrito ("sexta 14h") vale se preenchido. Apagar o dia tira o prazo.
 - **Avisos de atraso:** "ligar avisos" (lateral ou último passo do tutorial). Tarefa que passa do prazo vira notificação, uma vez por prazo. Só com o app aberto ou em segundo plano.
@@ -114,3 +114,8 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Copiar e colar cards:** ícone de copiar no card, ou "Copiar" na barra da seleção (Ctrl+C). Vai como texto pronto para WhatsApp: pasta em *negrito*, `☐ título` (feito: `✅ ~título~`), etiqueta em _itálico_ (tipo · criticidade · 📅 dd/mm/aaaa hh:mm · 🔁 repetição) e o texto do card recuado. "Colar" (ou Ctrl+V fora das caixas) cria um card por linha de qualquer texto; lê esse formato e o antigo `- [ ] Título (…)`; sem pasta vai para a pasta aberta.
 - **Avisos na tela não bloqueiam:** o aviso de baixo fica meio transparente e o clique passa por ele (só o Desfazer é botão).
 - **Concluir pelo ✓:** o card risca, brilha em verde e some antes de gravar.
+
+## Novidades (18/11/2026, tarde)
+- **Criação rápida:** o **+ Nova** abre uma linha no topo da pasta. Escreva e Enter: cria e a linha fica pronta para a próxima. `Pagar luz @ sexta 14h` põe prazo. "mais opções" abre o formulário completo com o título já escrito. Esc ou ✕ fecha.
+- **Check-list no card:** no texto do card, cada linha `[ ] item` vira caixinha marcável, com contador (☑ 2/5). Marcar grava na hora, sem concluir o card.
+- **Celular em 2 colunas:** cards de criticidade alta/crítica ocupam a linha toda; os outros, meia. Puxe o canto (riscos no canto de baixo) para a direita = inteiro, para a esquerda = meio, para baixo/cima = altura (1 a 4). O tamanho vale também no PC (inteiro no celular = largura 2+ lá).

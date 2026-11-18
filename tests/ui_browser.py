@@ -343,7 +343,24 @@ try:
         ok(item(a1)["estado"] == "arquivado", "Delete exclui a seleção")
         g.click("#toast button"); time.sleep(.6)
         # ---- nova tarefa à mão ----
+        # + abre a linha rápida: Enter cria e a linha fica pronta (com foco) para a próxima; "@" põe prazo
         g.click(".bnova")
+        g.fill(".rapida input", "Rápida um @ amanhã 9h"); g.press(".rapida input", "Enter")
+        g.wait_for_selector("#toast >> text=criado em")
+        g.fill(".rapida input", "Rápida dois"); g.press(".rapida input", "Enter")
+        g.wait_for_function("() => [...document.querySelectorAll('#vista h3')].some(h => h.textContent === 'Rápida dois')")
+        r1, r2 = item("Rápida um"), item("Rápida dois")
+        ok(r1 and r1["prazo_em"].endswith("T09:00") and r2 and r2["contexto"] == r1["contexto"], "criação rápida: Enter cria, @ põe prazo")
+        ok(g.evaluate("document.activeElement === document.querySelector('.rapida input') && document.querySelector('.rapida input').value === ''"), "linha rápida continua com foco depois do redesenho")
+        # check-list no texto do card: marcar grava no texto e conta
+        g.evaluate("([id, d]) => api(`/api/itens/${id}/editar`, { mudancas: { detalhe: d } }).then(() => { ultimo = ''; return atualizar(); })", [r2["id"], "[ ] pão\n[x] leite\nobs"])
+        cl = card("Rápida dois")
+        ok(cl.locator(".det .cont").inner_text() == "☑ 1/2" and cl.locator(".chk input").count() == 2, "linhas [ ] viram check-list com contador")
+        cl.locator(".chk input").first.click()
+        g.wait_for_function("() => [...document.querySelectorAll('.det .cont')].some(e => e.textContent === '☑ 2/2')")
+        ok(item("Rápida dois")["detalhe"] == "[x] pão\n[x] leite\nobs" and item("Rápida dois")["estado"] == "catalogado" and not card("Rápida dois").evaluate("e => e.classList.contains('sel')"),
+           "marcar item grava no texto, sem concluir nem selecionar o card")
+        g.click(".rapida .mais")
         g.fill(".nova input >> nth=0", "Preparar slides da aula")
         g.fill(".nova input[placeholder^='ex.: sexta']", "quando der")
         g.click(".nova .si")
@@ -385,6 +402,7 @@ try:
         g.screenshot(path=SAIDA / "15-apagar-pasta.png")
         g.click(".nova .si")
         g.wait_for_selector("#toast >> text=Pasta “Projetos Pessoais” apagada")
+        g.wait_for_function("!document.querySelector('[data-alvo=\"projetos_pessoais\"]')", timeout=8000)
         ok(item(tp)["contexto"] == "casa" and g.locator('[data-alvo="projetos_pessoais"]').count() == 0, "apagar pasta move os itens e some da lateral")
         g.click('[data-alvo="outro"]'); g.wait_for_selector("h2:text-is('Outro')")
         ok(g.locator("button", has_text="Apagar pasta").count() == 0, "Outro não tem Apagar pasta")
@@ -459,15 +477,32 @@ try:
         ok(m.evaluate("document.documentElement.scrollWidth<=innerWidth"), "sem rolagem horizontal no celular")
         bx = m.locator("#vista article .acts .ok").first.bounding_box()
         ok(bx["width"] >= 44 and bx["height"] >= 44, "botões do celular com 44 px")
-        ok(m.locator("#vista .rs:visible").count() == 0, "sem alça de tamanho no celular")
+        ok(m.locator("#vista .rs:visible").count() > 0, "alça de tamanho no celular")
+        larg_cards = m.eval_on_selector_all("#vista article.c", "a=>a.map(e=>Math.round(e.getBoundingClientRect().width))")
+        ok(len(set(larg_cards)) == 2 and max(larg_cards) > 1.8 * min(larg_cards), f"celular em 2 colunas: meio e inteiro {sorted(set(larg_cards))}")
         m.screenshot(path=SAIDA / "6-celular.png")
         cdp = ctx.new_cdp_session(m)
+        toque = lambda tipo, pts: cdp.send("Input.dispatchTouchEvent", {"type": tipo, "touchPoints": pts})
+        # puxar o canto: direita = inteiro, para baixo = mais alto; grava na grade
+        meio = m.locator("#vista article.c:not(.w2)").first
+        tm = meio.locator("h3").inner_text()
+        meio.evaluate("e => e.scrollIntoView({ block: 'center' })"); time.sleep(.2)
+        rb = meio.locator(".rs").bounding_box()
+        xr, yr = rb["x"] + 10, rb["y"] + 10
+        toque("touchStart", [{"x": xr, "y": yr}])
+        for i in range(1, 7):
+            toque("touchMove", [{"x": xr + 12 * i, "y": yr + 18 * i}]); time.sleep(.03)
+        ok("inteiro × 2" in m.inner_text("#vista .tamanho"), "prévia do tamanho ao puxar o canto")
+        toque("touchEnd", [])
+        m.wait_for_function(f"[...document.querySelectorAll('#vista article.c.w2 h3')].some(h => h.textContent === {tm!r})")
+        time.sleep(.4)
+        ok(item(tm)["grade_larg"] >= 2 and item(tm)["grade_alt"] == 2, "redimensionar no celular grava largura e altura")
+        ok(m.locator("#barra").is_hidden() and m.locator(".drag").count() == 0, "puxar o canto não seleciona nem arrasta")
         t7 = "Atualizar planilha de horas"
         cx = m.locator("#vista article", has=m.locator(f'h3:text-is("{t7}")'))
         cx.scroll_into_view_if_needed()
         a = cx.locator(".meta").bounding_box()
         dst = m.locator('[data-alvo="financas"]').bounding_box()
-        toque = lambda tipo, pts: cdp.send("Input.dispatchTouchEvent", {"type": tipo, "touchPoints": pts})
         x0, y0 = a["x"] + 40, a["y"] + 10
         toque("touchStart", [{"x": x0, "y": y0}])
         time.sleep(.5)
@@ -488,12 +523,13 @@ try:
         m.wait_for_function("!document.querySelector('#barra:not([hidden])')")
         hs = lambda: m.eval_on_selector_all("#vista article.c h3", "a=>a.map(e=>e.textContent)")
         ordem = hs()
+        m.evaluate("scrollTo(0, 0)"); time.sleep(.2)
         c0 = m.locator("#vista article.c").nth(0).locator(".meta").bounding_box()
         c2 = m.locator("#vista article.c").nth(2).locator(".meta").bounding_box()
         x0, y0 = c0["x"] + 40, c0["y"] + 10
         toque("touchStart", [{"x": x0, "y": y0}]); time.sleep(.5)
-        for i in range(1, 9):
-            toque("touchMove", [{"x": x0, "y": y0 + (c2["y"] + 10 - y0) * i / 8}]); time.sleep(.03)
+        for i in range(1, 9):  # 2 colunas: o destino pode estar ao lado
+            toque("touchMove", [{"x": x0 + (c2["x"] + 40 - x0) * i / 8, "y": y0 + (c2["y"] + 10 - y0) * i / 8}]); time.sleep(.03)
         ok("over" in (m.locator("#vista article.c").nth(2).get_attribute("class") or ""), "card de destino acende")
         m.screenshot(path=SAIDA / "7b-celular-trocar.png")
         toque("touchEnd", [])
@@ -516,6 +552,7 @@ try:
 
         # deslizar o card para a direita conclui (sem esperar segurar)
         cs = m.locator("#vista article.c")
+        m.evaluate("scrollTo(0, 0)"); time.sleep(.2)
         tz = cs.nth(0).locator("h3").inner_text()
         bz = cs.nth(0).locator(".meta").bounding_box()
         xz, yz = bz["x"] + 20, bz["y"] + 10

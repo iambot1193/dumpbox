@@ -35,6 +35,7 @@ PC = "http://127.0.0.1:8125"
 pc = subprocess.Popen([sys.executable, "-m", "uvicorn", "dumpbox.api:app", "--port", "8125", "--log-level", "warning"], cwd=RAIZ,
                       env={**os.environ, "PYTHONPATH": str(RAIZ / "backend"), "DUMPBOX_ORIGENS": f"http://127.0.0.1:{srv.server_port}"})
 falhas = []
+import atexit; atexit.register(pc.terminate)  # teste que quebra no meio não deixa o servidor da 8125 vivo
 
 
 def ok(cond, nome):
@@ -58,7 +59,12 @@ with sync_playwright() as p:
     # tutorial do 1º acesso: passa pelos passos, fecha e não volta; "ajuda" reabre
     g.wait_for_selector(".tour")
     ok(g.inner_text(".tour .passo") == "1 de 6", "tutorial abre no 1º acesso")
-    for _ in range(5):
+    time.sleep(.4)  # o destaque desliza até o alvo
+    caixa = g.evaluate("(() => { const a = document.querySelector('.furo').getBoundingClientRect(), b = document.getElementById('txt').getBoundingClientRect(); return a.left <= b.left && a.right >= b.right && a.top <= b.top; })()")
+    ok(caixa, "passo 1 destaca a caixa de nota")
+    for _ in range(3):
+        g.locator(".tour button", has_text="Pular passo").click()
+    for _ in range(2):
         g.locator(".tour button", has_text="Próximo").click()
     ok("Avisos" in g.inner_text(".tour h4"), "último passo fala dos avisos")
     g.locator(".tour button", has_text="Fechar").click()
@@ -66,7 +72,17 @@ with sync_playwright() as p:
     ok(g.locator(".tour").count() == 0, "tutorial não volta depois de visto")
     g.locator("#nav button", has_text="ajuda").click()
     ok(g.locator(".tour").count() == 1, "“ajuda” reabre o tutorial")
-    g.locator(".tour button", has_text="Pular").click()
+    # interativo: fazer na tela avança o passo (e a tela continua usável com o tutorial aberto)
+    g.locator(".tour button", has_text="Pular passo").click()
+    g.click(".bnova"); g.fill(".rapida input", "Tarefa do tutorial"); g.press(".rapida input", "Enter")
+    g.wait_for_selector(".tour .passo >> text=3 de 6")
+    ok(True, "criar pelo + avança o tutorial")
+    g.locator("#vista article", has=g.locator('h3:text-is("Tarefa do tutorial")')).locator(".ok").click()
+    g.wait_for_selector(".tour .passo >> text=4 de 6")
+    ok(True, "concluir pelo ✓ avança o tutorial")
+    g.locator(".tour button", has_text="Sair").click()
+    ok(g.locator(".tour, .furo").count() == 0, "Sair fecha o tutorial")
+    g.click(".rapida .fx")
 
     g.fill("#txt", "comprar pilhas\nAA e AAA")
     g.click("#guardar")

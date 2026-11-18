@@ -56,7 +56,10 @@ Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "ad
 - **Copiar/colar cards:** texto puro, sem servidor. `cardsEmTexto` gera formato WhatsApp (`*Pasta*`, `☐ Título`/`✅ ~Título~`, etiqueta `_tipo · criticidade · 📅 dd/mm/aaaa hh:mm · 🔁 todo dia_` e `detalhe` recuados); `textoEmCards` lê isso, o formato antigo `- [ ] Título (…)` ou qualquer texto (um card por linha) e cria via `POST /api/itens`. Sem acesso à área de transferência: caixa de texto.
 - **Prazo pelo calendário:** a tela manda ISO; servidor valida com `chat.data_iso` (local.js: `dataIso`). Texto escrito continua por `rules.py`.
 - **Avisos de atraso:** Notification API pelo service worker, checados a cada `atualizar()` (5 s); já avisados em `localStorage["dumpbox.avisados"]` (id → prazo). Teto: app fechado não avisa; para isso Web Push ou Telegram (fase 3).
-- **Tutorial:** 6 passos, abre se `localStorage["dumpbox.tour"]` vazio; "ajuda" reabre.
+- **Tutorial guiado:** `PASSOS` = [alvo, título, texto, ação]. Um `.furo` fixo (box-shadow escurece o resto, `pointer-events:none`) segue o alvo por requestAnimationFrame; a tela fica usável. A ação avança via `sinal(nome)` chamado por Guardar, criar (rápida/form) e `editar(estado=feito)`. Abre se `localStorage["dumpbox.tour"]` vazio; "ajuda" reabre.
+- **Criação rápida:** `abrirRapida()` = form fixo reaproveitado por `render()` (mantém o foco entre redesenhos). `título @ prazo` → `POST /api/itens`.
+- **Check-list:** `textoCard()` lê linhas `[ ]`/`[x]` do `detalhe`; marcar reescreve o `detalhe` por `POST /api/itens/{id}/editar` (grupo marcado como visto: sem aviso).
+- **Celular:** `.grid` vira 2 colunas (CSS, `!important` sobre a posição do PC); `w2` = inteiro, `--h` = altura. `redimCelular()` grava pelo mesmo `fixarGrade`/`/api/layout` do PC.
 
 ### Modelo de dados atual (servidor, `db.py`)
 - `captura(id UUID do cliente, texto, origem[web|chat|editor|manual], criado_em, status[pendente|ok|falhou], erro)`: texto original; só muda em "Apagar de vez".

@@ -147,6 +147,15 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 #toast .i{color:var(--ok)}#toast span{overflow-wrap:anywhere}
 #toast{pointer-events:none;opacity:.88}  /* aviso não bloqueia: clique passa por ele, só o Desfazer é botão */
 #toast button{font-weight:700;text-decoration:underline;white-space:nowrap;pointer-events:auto}
+.c .det.lista{display:block;-webkit-line-clamp:unset;white-space:normal}
+.chk{display:flex;align-items:flex-start;gap:7px;padding:3px 0;cursor:pointer}.chk input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--ok);flex:none}
+.chk input:checked+span{text-decoration:line-through;color:var(--mute)}
+.det .cont{display:block;font:12.5px var(--mono);color:var(--mute);margin-bottom:2px}.det .cont.ok{color:var(--ok)}
+.rapida{display:flex;gap:6px;align-items:center;margin:0 0 12px;border:1px solid var(--txt);background:var(--panel);padding:4px 4px 4px 10px}
+.rapida input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--txt);font:16px var(--mono);height:40px}
+.rapida button{height:40px;padding:0 9px;font:13px var(--mono);color:var(--mute);white-space:nowrap}.rapida button:hover{color:var(--txt)}
+.furo{position:fixed;z-index:44;pointer-events:none;box-shadow:0 0 0 200vmax rgba(5,6,4,.6);outline:2px solid var(--ok);transition:left .15s,top .15s,width .15s,height .15s}
+.dlg.tour{top:auto;bottom:16px}.dlg.tour.cima{top:12px;bottom:auto}.tour .espera{display:block;font:12.5px var(--mono);color:#3f6b12;margin:-6px 0 8px}
 .c.concluindo{animation:concluir .42s ease-in forwards;pointer-events:none}.c.concluindo h3{text-decoration:line-through;color:var(--ok)}
 @keyframes concluir{0%{box-shadow:0 0 0 0 var(--ok)}35%{transform:scale(1.03);box-shadow:0 0 0 3px var(--ok)}100%{transform:scale(.9) translateY(-6px);opacity:0;box-shadow:0 0 0 3px var(--ok)}}
 
@@ -186,7 +195,11 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
   .fila{font-size:12px;margin-top:5px}
   .hd{margin:9px 0 7px;gap:4px 8px}.hd h2{font-size:30px}.hd>span{font-size:13px}.ctl{margin-left:0;width:100%;font-size:12px}
   .ft button{padding:7px 6px}
-  .grid{display:flex;flex-direction:column;gap:8px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:minmax(84px,auto);gap:8px}
+  .grid>.c{grid-column:span 1!important;grid-row:span var(--h,1)!important;min-width:0}.grid>.c.w2{grid-column:span 2!important}
+  .grid>.c:not(.w2) .acts .cp,.grid>.c:not(.w2) .acts .mv{display:none}.grid>.c:not(.w2) .acts div button{width:34px}
+  .grid .rs{display:block;width:24px;height:24px;touch-action:none;opacity:.45}.grid .c:has(.rs) .acts{padding-right:18px}
+  .rapida .mais{font-size:12px;padding:0 6px}
   .c{padding:8px 10px 4px;overflow:visible;touch-action:pan-y}.c.desliza{transition:none;background:#1f3324}.c h3,.c.w2 h3{font-size:18px;margin:2px 0 4px;-webkit-line-clamp:unset}.c.alta h3,.c.critica h3{font-size:22px;font-weight:700}
   .sig{padding:8px 0 8px 10px}
   #toast{left:78px;right:8px;bottom:70px;max-width:none}

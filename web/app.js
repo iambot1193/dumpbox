@@ -141,6 +141,7 @@ async function editar(ids, campo, valor) {
   try {
     const r = await api("/api/itens/editar", { ids: [].concat(ids), campo, valor });
     if (r.grupo) { (vistos ||= new Set()).add(r.grupo); toast(r.descricao, r.grupo); }
+    if (campo === "estado" && valor === "feito") sinal("feito");
     ultimo = ""; await atualizar();
   } catch (e) { if (String(e.message) !== "401") toast("Não consegui salvar. O PC está ligado?"); }
 }
@@ -377,7 +378,7 @@ function caixaTexto(titulo, msg, valor, usar) {  // sem acesso à área de trans
 
 // ---- tarefa criada à mão (sem IA) ----
 function opcoes(s, lista, padrao) { for (const [v, t] of lista) { const o = el("option", "", t); o.value = v; s.append(o); } s.value = padrao; return s; }
-function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
+function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que mudou)
   dlgAberto = true; fecharMenu();
   const v = el("div", "veu"), f = el("form", "dlg nova"), fim = () => { v.remove(); f.remove(); dlgAberto = false; };
   const campo = (rot, ctl) => { const l = el("label"); l.append(el("span", "", rot), ctl); return l; };
@@ -395,9 +396,9 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
   dia.oninput = () => { prazo.value = ""; };
   hora.oninput = () => { prazo.value = ""; if (hora.value && !dia.value) dia.value = horaLocal().slice(0, 10); };
   const prazoFinal = () => prazo.value.trim() || (dia.value ? dia.value + (hora.value ? "T" + hora.value : "") : "");
-  const det = el("textarea"); det.maxLength = 2000; det.rows = 3; det.placeholder = "Detalhes, links, passos… (opcional)"; det.value = it?.detalhe || "";
+  const det = el("textarea"); det.maxLength = 2000; det.rows = 3; det.placeholder = "Detalhes, links… (opcional). Check-list: uma linha “[ ] item” por item"; det.value = it?.detalhe || "";
   const rep = opcoes(el("select"), [["", "não repete"], ...Object.entries(REPETE)], it?.repete || "");
-  if (it) titulo.value = it.titulo || "";
+  titulo.value = it ? it.titulo || "" : tituloIni || "";
   const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
   no.type = "button"; no.onclick = fim; v.onclick = fim;
   f.onkeydown = e => { if (e.key === "Escape") fim(); };
@@ -416,7 +417,7 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
         fim(); ultimo = ""; return atualizar();
       }
       const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: det.value.trim() || null });
-      fim(); toast(r.descricao); ultimo = ""; atualizar();
+      fim(); toast(r.descricao); sinal("criar"); ultimo = ""; atualizar();
     } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
   const linha2 = el("div", "duas"); linha2.append(campo("Pasta", pastaS), campo("Tipo", tipo));
@@ -460,7 +461,32 @@ function apagarPasta(slug) {
     return () => { toast(r.descricao); ir("hoje"); ultimo = ""; atualizar(); };
   });
 }
-const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefa à mão", () => novaTarefa());
+const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefas rápido (Enter cria e já deixa pronto para a próxima)", abrirRapida);
+// ---- criação rápida: o + abre uma linha no topo; Enter cria e limpa, pronta para a próxima ----
+let rapida = null;
+function abrirRapida() {
+  if (!rapida) {
+    const f = el("form", "rapida"), inp = el("input");
+    inp.maxLength = 260; inp.placeholder = "Nova tarefa… Enter cria · “@ sexta 14h” põe prazo"; inp.setAttribute("aria-label", "Nova tarefa rápida");
+    inp.onkeydown = e => { if (e.key === "Escape") fecharRapida(); };
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const [titulo, prazo] = inp.value.split(/\s+@\s*/, 2).map(s => s.trim());
+      if (!titulo) return;
+      try {
+        const r = await api("/api/itens", { titulo, contexto: NOME[vista] ? vista : "outro", tipo: "tarefa", prazo: prazo || (vista === "hoje" ? "hoje" : null) });
+        inp.value = ""; toast(r.descricao); sinal("criar"); ultimo = ""; atualizar();
+      } catch (x) { if (String(x.message) !== "401") toast(typeof x.detail === "string" ? x.detail : "Não consegui criar. O PC está ligado?"); }
+    };
+    f.append(inp, botao("mais", ["mais opções"], "Formulário completo (pasta, texto, prazo no calendário, repetir)", () => { const t = inp.value; fecharRapida(); novaTarefa(null, t); }),
+      botao("fx", [ic("x")], "Fechar", fecharRapida));
+    for (const b of f.querySelectorAll("button")) b.type = "button";  // Enter envia o form, não clica "mais opções"
+    rapida = f;
+  }
+  $("vista").querySelector(".hd")?.after(rapida);
+  rapida.querySelector("input").focus();
+}
+function fecharRapida() { rapida?.remove(); rapida = null; }
 const botaoColar = () => botao("bcolar", [ic("paste"), "Colar"], "Criar cards do que foi copiado (ou Ctrl+V fora da caixa)", () => colar());
 const botaoSel = () => botao("bsel" + (modoSel ? " on" : ""), ["Selecionar"], "Selecionar vários (no PC: Ctrl+clique, Shift+clique, Ctrl+A)",
   e => { modoSel = !modoSel; if (!modoSel) sel.clear(); e.currentTarget.classList.toggle("on", modoSel); marcarSel(); });
@@ -600,6 +626,7 @@ function redimensionavel(alca, card, it, p) {
   alca.addEventListener("pointerdown", ini => {
     ini.stopPropagation(); ini.preventDefault();
     gesto = true; fecharMenu();
+    if (!matchMedia(AREA_GRADE).matches) return redimCelular(ini, card, it, p);
     const grade = card.closest(".grid"), r = card.getBoundingClientRect(), g = grade.getBoundingClientRect(), largCel = (g.width - GAP * (COLS - 1)) / COLS;
     const cards = new Map(cardsVisiveis().map(c => [+c.dataset.id, c]));
     const etiqueta = el("span", "tamanho");
@@ -636,7 +663,51 @@ function redimensionavel(alca, card, it, p) {
   });
 }
 
+// celular: grade de 2 colunas. Puxar o canto para a direita = inteiro, para a esquerda = meio; para baixo/cima = altura 1-4.
+// ponytail: o tamanho é o mesmo do PC (inteiro no celular = largura ≥2 lá); tamanho separado por tela se incomodar
+function redimCelular(ini, card, it, p) {
+  const etiqueta = el("span", "tamanho");
+  let larg = p.larg > 1 ? 2 : 1, alt = p.alt;
+  const previa = () => { card.classList.toggle("w2", larg === 2); card.style.setProperty("--h", alt); etiqueta.textContent = `${larg === 2 ? "inteiro" : "meio"} × ${alt}`; };
+  card.classList.add("rsz"); card.append(etiqueta); previa();
+  const mover = e => {
+    const dx = e.clientX - ini.clientX, dy = e.clientY - ini.clientY;
+    const l = dx > 30 ? 2 : dx < -30 ? 1 : (p.larg > 1 ? 2 : 1), a = Math.min(4, Math.max(1, p.alt + Math.round(dy / 92)));
+    if (l !== larg || a !== alt) { larg = l; alt = a; previa(); }
+  };
+  const soltar = () => {
+    document.removeEventListener("pointermove", mover); document.removeEventListener("pointerup", soltar); document.removeEventListener("pointercancel", soltar);
+    etiqueta.remove(); card.classList.remove("rsz"); gesto = false; semClique = performance.now() + 300;
+    const L = larg === 2 ? Math.max(2, p.larg) : 1;
+    if (L !== p.larg || alt !== p.alt) fixarGrade({ id: it.id, col: Math.min(p.col, COLS - L + 1), lin: p.lin, larg: L, alt });
+    else { ultimo = ""; render(); }
+  };
+  document.addEventListener("pointermove", mover); document.addEventListener("pointerup", soltar); document.addEventListener("pointercancel", soltar);
+}
+
 // ---- desenho ----
+const CHK = /^\s*(?:[-*]\s*)?\[([ xX])\]\s*(.*)$/;
+function textoCard(it) {  // texto do card; linhas "[ ] item" viram check-list marcável (grava no próprio texto, sem aviso)
+  const d = el("div", "det"), linhas = it.detalhe.split("\n");
+  let feitos = 0, total = 0;
+  linhas.forEach((l, k) => {
+    const m = l.match(CHK);
+    if (!m) return d.append(el("span", "", l + "\n"));
+    const marcado = m[1] !== " ", lb = el("label", "chk"), cb = el("input");
+    total++; feitos += marcado;
+    cb.type = "checkbox"; cb.checked = marcado;
+    lb.onclick = e => e.stopPropagation();  // marcar não seleciona o card
+    cb.onchange = async () => {
+      const novo = [...linhas]; novo[k] = l.replace(/\[[ xX]\]/, cb.checked ? "[x]" : "[ ]");
+      try { const r = await api(`/api/itens/${it.id}/editar`, { mudancas: { detalhe: novo.join("\n") } }); if (r.grupo) (vistos ||= new Set()).add(r.grupo); }
+      catch { cb.checked = !cb.checked; return toast("Não consegui salvar. O PC está ligado?"); }
+      ultimo = ""; atualizar();
+    };
+    lb.append(cb, el("span", "", m[2])); d.append(lb);
+  });
+  if (total) { d.classList.add("lista"); d.prepend(el("small", "cont" + (feitos === total ? " ok" : ""), `☑ ${feitos}/${total}`)); }
+  return d;
+}
 function cartao(it, comPasta) {
   const a = el("article", `c t-${it.tipo || "nota"} ${nivel(it)[0]} ${it.estado}${sel.has(it.id) ? " sel" : ""}`);
   a.dataset.id = it.id;
@@ -649,7 +720,7 @@ function cartao(it, comPasta) {
   const meta = el("div", "meta"); meta.append(k, sig);
   const h = el("h3", "", it.titulo); h.title = it.titulo || "";
   a.append(meta, h);
-  if (it.detalhe) a.append(el("p", "det", it.detalhe));
+  if (it.detalhe) a.append(textoCard(it));
   if (atrasado(it)) {
     const n = -dias(it.prazo_em), chip = el("span", "chip"), d = el("div", "due");
     chip.append(ic("alert"), `atrasado ${n} dia${n > 1 ? "s" : ""}`); d.append(chip); a.append(d);
@@ -718,6 +789,7 @@ function vPasta(v) {
     const p = pos.get(i.id), c = cartao(i);
     c.style.gridColumn = `${p.col}/span ${p.larg}`; c.style.gridRow = `${p.lin}/span ${p.alt}`;
     if (p.larg > 1) c.classList.add("w2");
+    c.style.setProperty("--h", p.alt);  // celular: 2 colunas (w2 = inteiro), altura em linhas
     c.style.setProperty("--l", p.alt === 1 ? (p.larg > 1 ? 1 : 2) : p.alt * (p.larg > 1 ? 3 : 5));
     const alca = el("div", "rs"); alca.title = "Puxe para mudar o tamanho";
     redimensionavel(alca, c, i, p);
@@ -793,13 +865,15 @@ function desenhaNav() {
 function render() {
   gradeAtual = null;
   desenhaNav();
-  const v = $("vista"); v.replaceChildren();
+  const v = $("vista"), foco = rapida && document.activeElement === rapida.firstChild;  // a linha rápida sobrevive ao redesenho, com o foco
+  v.replaceChildren();
   if (norm($("busca").value).trim()) vBusca(v);
   else if (vista === "hoje") vHoje(v);
   else if (vista === "revisar") vRevisar(v);
   else if (vista === "lixeira") vLixeira(v);
   else if (NOME[vista]) vPasta(v);
   else return ir("hoje");
+  if (rapida) { v.querySelector(".hd")?.after(rapida); if (foco) rapida.firstChild.focus(); }
   const naTela = new Set(cardsVisiveis().map(c => +c.dataset.id));
   for (const id of sel) if (!naTela.has(id)) sel.delete(id);
   marcarSel();
@@ -853,27 +927,51 @@ async function avisarVencidos() {
   try { new Notification(titulo, { body: corpo, tag: "dumpbox-vencidas" }); } catch {}
 }
 
-// ---- tutorial: abre sozinho no 1º acesso; depois, pelo "ajuda" da lateral ----
+// ---- tutorial guiado: abre sozinho no 1º acesso (depois pelo "ajuda"); destaca a parte da tela e espera você fazer ----
 const TOUR = "dumpbox.tour";
-const PASSOS = [
-  ["Bem-vindo ao dumpbox", "Despeje tudo na caixa de cima, solto e misturado, e toque Guardar. Com o PC, a IA separa em tarefas, prazos e pastas. O microfone dita por voz."],
-  ["Pastas e Hoje", "A lateral tem as pastas. Hoje junta o que vence hoje e o que está atrasado. O + cria uma pasta. A busca procura em todas."],
-  ["Cards", "✓ conclui, ou deslize o card para a direita. O lápis edita: texto, prazo no calendário (dia e hora) e repetição. As setas mudam de pasta."],
-  ["Vários de uma vez", "No celular: segure o dedo num card e toque nos outros. No PC: Ctrl+clique ou Shift+clique. A barra de baixo conclui, copia, move ou exclui todos."],
-  ["Copiar e colar", "Copiar põe os cards na área de transferência como texto. Colar (ou Ctrl+V fora da caixa) cria cards de qualquer texto: um por linha."],
-  ["Avisos", "Ligue os avisos para receber uma notificação quando uma tarefa passar do prazo (com o app aberto ou em segundo plano)."],
+const PASSOS = [  // [alvo, título, texto, ação que avança (sem ação: botão Próximo)]
+  ["#txt", "Despeje uma nota", "Escreva qualquer coisa na caixa e toque Guardar. Com o PC, a IA separa em tarefas, prazos e pastas. O microfone dita por voz.", "guardar"],
+  [".bnova", "Criar rápido", "Toque + e escreva uma tarefa. Enter cria e já deixa a linha pronta para a próxima. “@ sexta 14h” põe prazo.", "criar"],
+  ["#vista .c .ok", "Concluir", "Toque ✓ num card, ou deslize o card para a direita.", "feito"],
+  [".bsel", "Vários de uma vez", "No celular: segure o dedo num card e toque nos outros. No PC: Ctrl+clique. A barra de baixo conclui, copia, move ou exclui. Copiar gera texto pronto para o WhatsApp; Colar cria cards de qualquer texto."],
+  ["#nav", "Pastas e Hoje", "A lateral tem as pastas. Hoje junta o que vence hoje e o que está atrasado. No texto do card, linhas “[ ] item” viram check-list. No celular, puxe o canto do card para mudar o tamanho."],
+  [null, "Avisos", "Ligue os avisos para receber uma notificação quando uma tarefa passar do prazo (com o app aberto ou em segundo plano)."],
 ];
+let tour = null;  // a tela continua usável: só um destaque (furo no escuro, sem bloquear o toque) e um balão
 function tutorial(k = 0) {
-  dlgAberto = true; fecharMenu();
-  const v = el("div", "veu"), d = el("div", "dlg tour"), pe = el("div"), ult = k === PASSOS.length - 1;
-  const sai = () => { v.remove(); d.remove(); dlgAberto = false; };
-  const fim = () => { sai(); try { localStorage.setItem(TOUR, "1"); } catch {} };
-  pe.append(botao("no", [ult ? "Fechar" : "Pular"], null, fim));
+  fimTutorial(false); fecharMenu();
+  const [alvoSel, titulo, texto, espera] = PASSOS[k], ult = k === PASSOS.length - 1;
+  const furo = el("div", "furo"), b = el("div", "dlg tour"), pe = el("div");
+  const fim = () => fimTutorial(true);
+  pe.append(botao("no", [ult ? "Fechar" : "Sair"], null, fim));
   if (ult && temAvisos && Notification.permission === "default") pe.append(botao("si ok", ["Ligar avisos"], null, () => { fim(); ativarAvisos(); }));
-  if (!ult) pe.append(botao("si ok", ["Próximo"], null, () => { sai(); tutorial(k + 1); }));
-  v.onclick = fim; d.onkeydown = e => { if (e.key === "Escape") fim(); };
-  d.append(el("small", "passo", `${k + 1} de ${PASSOS.length}`), el("h4", "", PASSOS[k][0]), el("p", "", PASSOS[k][1]), pe);
-  document.body.append(v, d); pe.lastChild.focus();
+  if (!ult) pe.append(botao(espera ? "no" : "si ok", [espera ? "Pular passo" : "Próximo"], null, () => tutorial(k + 1)));
+  b.append(el("small", "passo", `${k + 1} de ${PASSOS.length}`), el("h4", "", titulo), el("p", "", texto));
+  if (espera) b.append(el("small", "espera", "Faça na tela para continuar"));
+  b.append(pe);
+  document.body.append(furo, b);
+  tour = { k, furo, b, espera, raf: 0 };
+  const seguir = () => {  // acompanha o alvo (rolagem, redesenho, teclado do celular)
+    if (tour?.furo !== furo) return;
+    const alvo = alvoSel && [...document.querySelectorAll(alvoSel)].find(e => e.getClientRects().length);
+    if (alvo) {
+      const r = alvo.getBoundingClientRect();
+      Object.assign(furo.style, { display: "block", left: r.left - 4 + "px", top: r.top - 4 + "px", width: r.width + 8 + "px", height: r.height + 8 + "px" });
+      b.classList.toggle("cima", r.top + r.height / 2 > innerHeight / 2);
+    } else furo.style.display = "none";
+    tour.raf = requestAnimationFrame(seguir);
+  };
+  seguir();
+}
+function fimTutorial(visto) {
+  if (tour) { cancelAnimationFrame(tour.raf); tour.furo.remove(); tour.b.remove(); tour = null; }
+  if (visto) try { localStorage.setItem(TOUR, "1"); } catch {}
+}
+function sinal(acao) {  // a tela avisa o que o usuário fez; se era o que o passo pedia, avança
+  if (!tour || tour.espera !== acao) return;
+  const k = tour.k; tour.espera = null;
+  tour.b.querySelector(".espera").textContent = "Boa! ✓";
+  setTimeout(() => { if (tour?.k === k) tutorial(k + 1); }, 700);
 }
 
 // ---- captura ----
@@ -885,7 +983,7 @@ $("guardar").onclick = async () => {
   const f = lerFila(); f.push(anexo ? { id: uuid(), imagem: anexo, texto, criado_em: horaLocal() } : { id: uuid(), texto, criado_em: horaLocal() });
   if (!gravaFila(f)) { toast("Sem espaço para guardar a foto offline. Envie com o PC ligado."); return; }
   if (anexo) toast("Foto enviada: a IA lê a lista e cria os itens (pode levar 1 min).");
-  $("txt").value = ""; anexar(null); crescer(); await enviarFila(); atualizar();
+  $("txt").value = ""; anexar(null); crescer(); await enviarFila(); sinal("guardar"); atualizar();
 };
 
 // ditado: reconhecimento de voz do próprio navegador (Chrome manda o áudio para o serviço do Google)

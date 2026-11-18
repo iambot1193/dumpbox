@@ -421,8 +421,8 @@ try:
         for t in tc: h3(t).click(modifiers=["Control"])
         g.keyboard.press("Control+c")
         g.wait_for_selector("#toast >> text=2 cards copiados")
-        clip = g.evaluate("navigator.clipboard.readText()")
-        ok(clip.count("\n- [") == 1 and all(f"] {t} (Casa · " in clip for t in tc), f"Ctrl+C copia os selecionados como lista {clip!r}")
+        clip = g.evaluate("navigator.clipboard.readText()").replace("\r\n", "\n")  # Windows devolve \r\n
+        ok(clip.startswith("*Casa*\n") and all(f"☐ {t}\n    _" in clip for t in tc), f"Ctrl+C copia os selecionados como lista para WhatsApp {clip!r}")
         g.keyboard.press("Escape")
         g.click(".bcolar")
         g.wait_for_selector("#toast >> text=2 cards colados")
@@ -431,7 +431,7 @@ try:
         ok(all(conta(t) == 2 for t in tc) and all(x["contexto"] == "casa" for x in copias), "Colar cria os cards copiados")
         ok(any(x["detalhe"] == "ligar antes\nlevar documentos" for x in copias) if te in tc else True, "texto do card vai junto na cópia")
         # Ctrl+V de texto qualquer fora da caixa: um card por linha, etiqueta do dumpbox lida
-        g.evaluate("""() => { const dt = new DataTransfer(); dt.setData('text/plain', '- [ ] Colado A (Casa · ideia · alta · prazo 2026-12-01 09:00)\\n  com detalhe\\n• Colado B (sem etiqueta)\\n- [x] Colado C');
+        g.evaluate("""() => { const dt = new DataTransfer(); dt.setData('text/plain', '*Casa*\\n☐ Colado A\\n    _ideia · alta · 📅 01/12/2026 09:00_\\n    com detalhe\\n- [ ] Colado B (sem etiqueta)\\n✅ ~Colado C~');
           document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }""")
         g.wait_for_function("() => !/2 cards colados/.test(document.querySelector('#toast').innerText)", timeout=15000)
         ok("3 cards colados" in g.inner_text("#toast"), f"Ctrl+V cola 3 cards ({g.inner_text('#toast')})")

@@ -145,7 +145,10 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 
 #toast{position:fixed;left:276px;bottom:18px;max-width:min(560px,calc(100vw - 380px));display:flex;align-items:center;gap:14px;background:var(--raise);border:1px solid var(--txt);padding:10px 14px;font:14px var(--mono);z-index:30}
 #toast .i{color:var(--ok)}#toast span{overflow-wrap:anywhere}
-#toast button{font-weight:700;text-decoration:underline;white-space:nowrap}
+#toast{pointer-events:none;opacity:.88}  /* aviso não bloqueia: clique passa por ele, só o Desfazer é botão */
+#toast button{font-weight:700;text-decoration:underline;white-space:nowrap;pointer-events:auto}
+.c.concluindo{animation:concluir .42s ease-in forwards;pointer-events:none}.c.concluindo h3{text-decoration:line-through;color:var(--ok)}
+@keyframes concluir{0%{box-shadow:0 0 0 0 var(--ok)}35%{transform:scale(1.03);box-shadow:0 0 0 3px var(--ok)}100%{transform:scale(.9) translateY(-6px);opacity:0;box-shadow:0 0 0 3px var(--ok)}}
 
 #ia{position:fixed;right:18px;bottom:82px;width:344px;max-width:calc(100vw - 36px);background:var(--txt);color:var(--ink);z-index:35;font:14px/1.3 var(--mono)}
 .ai-h{display:flex;align-items:center;gap:7px;background:var(--ink);color:var(--txt);border:1px solid var(--txt);padding:7px 12px;font:700 15.5px Barlow,sans-serif}

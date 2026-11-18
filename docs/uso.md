@@ -111,4 +111,6 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Prazo pelo calendário:** dia e hora (opcional) no Nova/Editar; o campo escrito ("sexta 14h") vale se preenchido. Apagar o dia tira o prazo.
 - **Avisos de atraso:** "ligar avisos" (lateral ou último passo do tutorial). Tarefa que passa do prazo vira notificação, uma vez por prazo. Só com o app aberto ou em segundo plano.
 - **Deslizar para concluir:** faixa verde atrás do card; ao passar do ponto fica marcada e o card sai deslizando.
-- **Copiar e colar cards:** ícone de copiar no card, ou "Copiar" na barra da seleção (Ctrl+C). Vai como texto: `- [ ] Título (Pasta · tipo · criticidade · prazo AAAA-MM-DD HH:MM)`, com o texto do card recuado abaixo. "Colar" (ou Ctrl+V fora das caixas) cria um card por linha de qualquer texto; a etiqueta é lida, `[x]` entra feito, sem pasta vai para a pasta aberta.
+- **Copiar e colar cards:** ícone de copiar no card, ou "Copiar" na barra da seleção (Ctrl+C). Vai como texto pronto para WhatsApp: pasta em *negrito*, `☐ título` (feito: `✅ ~título~`), etiqueta em _itálico_ (tipo · criticidade · 📅 dd/mm/aaaa hh:mm · 🔁 repetição) e o texto do card recuado. "Colar" (ou Ctrl+V fora das caixas) cria um card por linha de qualquer texto; lê esse formato e o antigo `- [ ] Título (…)`; sem pasta vai para a pasta aberta.
+- **Avisos na tela não bloqueiam:** o aviso de baixo fica meio transparente e o clique passa por ele (só o Desfazer é botão).
+- **Concluir pelo ✓:** o card risca, brilha em verde e some antes de gravar.

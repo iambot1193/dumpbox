@@ -293,39 +293,53 @@ document.addEventListener("keydown", e => {
 // - [ ] Título (Freelance · tarefa · baixa · prazo 2026-11-20 14:00 · repete semanal)
 //   texto do card, recuado
 const NIVEL_DE = Object.fromEntries(NIVEIS.map(([v, n]) => [norm(n), v]));
+// cópia legível no WhatsApp (*negrito* = pasta, _itálico_ = etiqueta, ~riscado~ = feito); textoEmCards lê de volta
+const dataBr = p => `${p.slice(8, 10)}/${p.slice(5, 7)}/${p.slice(0, 4)}` + (p.length > 10 ? " " + p.slice(11, 16) : "");
 function cardsEmTexto(its) {
-  return its.map(i => {
-    const meta = [NOME[pasta(i)], i.tipo, nivel(i)[1], i.prazo_em && "prazo " + i.prazo_em.replace("T", " "), REPETE[i.repete] && "repete " + i.repete].filter(Boolean);
-    const det = (i.detalhe || "").trim();
-    return `- [${aberto(i) ? " " : "x"}] ${i.titulo} (${meta.join(" · ")})` + (det ? "\n" + det.split("\n").map(l => "  " + l).join("\n") : "");
-  }).join("\n");
+  const ordem = s => PASTAS.findIndex(([slug]) => slug === s), linhas = [];
+  let atual = null;
+  for (const i of [...its].sort((x, y) => ordem(pasta(x)) - ordem(pasta(y)))) {
+    if (pasta(i) !== atual) { if (atual !== null) linhas.push(""); atual = pasta(i); linhas.push(`*${NOME[atual]}*`); }
+    linhas.push(aberto(i) ? `☐ ${i.titulo}` : `✅ ~${i.titulo}~`);
+    const meta = [i.tipo !== "tarefa" && i.tipo, nivel(i)[1], i.prazo_em && "📅 " + dataBr(i.prazo_em), REPETE[i.repete] && "🔁 " + REPETE[i.repete]].filter(Boolean);
+    linhas.push(`    _${meta.join(" · ")}_`);
+    for (const l of (i.detalhe || "").trim().split("\n")) if (l.trim()) linhas.push("    " + l);
+  }
+  return linhas.join("\n");
 }
-function lerMeta(s) {  // etiqueta entre parênteses; algo que não é do dumpbox: null (os parênteses ficam no título)
-  const r = {}, partes = s.split(" · ").map(x => x.trim());
+function lerMeta(s) {  // etiqueta (nova: _…_ recuada; antiga: entre parênteses); algo que não é do dumpbox: null
+  const r = {}, partes = s.split(" · ").map(x => x.trim()), REP = Object.fromEntries(Object.entries(REPETE).map(([k, v]) => [v, k]));
+  let d;
   for (const [k, t] of partes.entries()) {
     const n = norm(t), p = PASTAS.find(([, nome]) => norm(nome) === n);
     if (p) r.contexto = p[0];
     else if (TIPOS.includes(n)) r.tipo = n;
     else if (NIVEL_DE[n]) r.prioridade = NIVEL_DE[n];
     else if (/^prazo \d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(t)) r.prazo = t.slice(6).replace(" ", "T");
+    else if ((d = t.match(/^📅 (\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}:\d{2}))?$/))) r.prazo = `${d[3]}-${d[2]}-${d[1]}` + (d[4] ? "T" + d[4] : "");
     else if (/^repete (diario|semanal|mensal)$/.test(t)) r.repete = t.slice(7);
+    else if (t.startsWith("🔁 ") && REP[t.slice(3)]) r.repete = REP[t.slice(3)];
     else if (!(k === 0 && partes.length > 1)) return null;  // 1º = pasta que não existe neste aparelho: vai para a atual
   }
   return r;
 }
-function textoEmCards(txt) {  // um card por linha; linha recuada (ou "> ") é texto do card de cima
+function textoEmCards(txt) {  // um card por linha; linha recuada (ou "> ") é etiqueta/texto do card de cima; *Pasta* muda a pasta
   const cards = [];
+  let daPasta = null;
   for (const linha of txt.replace(/\r/g, "").split("\n")) {
     if (!linha.trim()) continue;
+    const cab = linha.trim().match(/^\*([^*]+)\*$/);
+    if (cab) { daPasta = PASTAS.find(([, nome]) => norm(nome) === norm(cab[1]))?.[0] || null; continue; }
     if (cards.length && /^(\s{2,}|\t|>)/.test(linha)) {
-      const c = cards.at(-1); c.detalhe = (c.detalhe ? c.detalhe + "\n" : "") + linha.replace(/^(\s{2}|\t|>\s?)/, "");
+      const c = cards.at(-1), l = linha.replace(/^(\s{2,}|\t|>\s?)/, ""), e = l.match(/^_(.+)_$/), m = e && lerMeta(e[1]);
+      if (m) Object.assign(c, m); else c.detalhe = (c.detalhe ? c.detalhe + "\n" : "") + l;
       continue;
     }
-    const m = linha.trim().match(/^(?:[-*•]\s+)?(?:\[([ xX])\]\s+)?(.*)$/);
-    let titulo = m[2].trim(), meta = {};
+    const m = linha.trim().match(/^(?:[-*•]\s+)?(?:\[([ xX])\]\s+|(☐|☑️?|✅|✔️?)\s*)?(.*)$/);
+    let titulo = m[3].trim().replace(/^~(.+)~$/, "$1"), meta = {};
     const p = titulo.match(/^(.*?)\s*\(([^()]*)\)$/), lido = p && p[1] && lerMeta(p[2]);
     if (lido) { titulo = p[1].trim(); meta = lido; }
-    if (titulo) cards.push({ titulo: titulo.slice(0, 200), feito: !!m[1] && m[1] !== " ", ...meta });
+    if (titulo) cards.push({ titulo: titulo.slice(0, 200), feito: (!!m[1] && m[1] !== " ") || (!!m[2] && m[2] !== "☐"), ...(daPasta && { contexto: daPasta }), ...meta });
   }
   return cards;
 }
@@ -647,7 +661,11 @@ function cartao(it, comPasta) {
   const feito = aberto(it);
   dir.append(botao("cp", [ic("copy")], "Copiar", () => copiar(it.id)), botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)),botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
     botao("tr", [ic("trash")], "Excluir", () => editar(it.id, "estado", "arquivado")));
-  acts.append(botao("ok", [ic(feito ? "check" : "retry")], feito ? "Marcar como feito" : "Reabrir", () => editar(it.id, "estado", feito ? "feito" : "catalogado")), dir);
+  acts.append(botao("ok", [ic(feito ? "check" : "retry")], feito ? "Marcar como feito" : "Reabrir", () => {
+    if (!feito) return editar(it.id, "estado", "catalogado");
+    a.classList.add("concluindo");  // risca, brilha e some; depois grava (falhou: o card volta)
+    setTimeout(() => editar(it.id, "estado", "feito").finally(() => a.classList.remove("concluindo")), 420);
+  }), dir);
   a.append(acts);
   arrastavel(a, it);
   return a;

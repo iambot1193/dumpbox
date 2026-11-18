@@ -5,6 +5,7 @@ No fim conecta a um servidor de verdade (banco temporário, outra origem = CORS 
     python tests/ui_local.py        (precisa de playwright; caminho extra: DUMPBOX_PW_PATH)
 """
 import functools
+import json
 import http.server
 import os
 import subprocess
@@ -169,6 +170,30 @@ with sync_playwright() as p:
     titulos = [i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"]]
     ok({"Item do PC 1", "Item do PC 2", "comprar pilhas", "Pagar boleto"} <= set(titulos), f"cópia entra e o que nasceu no celular fica {titulos}")
     ok(g.locator('[data-alvo="mercado"]').count() == 1, "pasta do PC aparece no celular")
+
+    # ---- backup: alerta sem backup, salvar arquivo, restaurar depois de perder os dados ----
+    g.wait_for_function("document.querySelector('#prep').textContent.includes('ainda não fez backup')", timeout=5000)
+    ok(True, "alerta no topo: ainda sem backup")
+    g.click("#prep")
+    with g.expect_download() as dl:
+        g.click(".dlg button:has-text('Salvar backup')")
+    bk = Path(tempfile.mkdtemp()) / dl.value.suggested_filename
+    dl.value.save_as(bk)
+    dados = json.loads(bk.read_text(encoding="utf-8"))
+    ok(dados.get("backup") and len(dados["itens"]) == len(g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens")), "backup tem todos os itens")
+    g.wait_for_function("!document.querySelector('#prep').textContent.includes('backup.')", timeout=5000)
+    antes = sorted(i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"])
+    g.evaluate("localStorage.removeItem('dumpbox.local'); localStorage.removeItem('dumpbox.local.backup_em')")
+    g.reload()
+    g.wait_for_selector("#nav .fold")
+    ok(not g.evaluate(api, ["/api/itens", None])[1]["itens"], "dados apagados (simula limpar o navegador)")
+    g.click("#prep")
+    with g.expect_file_chooser() as fc:
+        g.click(".dlg button:has-text('Restaurar backup')")
+    fc.value.set_files(str(bk))
+    g.wait_for_selector("#toast >> text=Backup restaurado")
+    ok(sorted(i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"]) == antes, "restaurar backup devolve tudo")
+    ok(g.locator('[data-alvo="mercado"]').count() == 1, "pastas voltam com o backup")
 
     # ---- conectar ao PC: endereço pelo aviso do topo, senha do PC, notas locais sobem ----
     g.context.set_offline(False)

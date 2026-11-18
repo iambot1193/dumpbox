@@ -14,6 +14,23 @@
   S ||= { seq: 1, itens: [], alt: [], pastas: PADRAO.map(([slug, nome]) => ({ slug, nome, descricao: "" })) };
   const salvar = () => localStorage.setItem(K, JSON.stringify(S));  // cheio: lança, a tela mostra "não consegui salvar"
   try { salvar(); } catch {}  // 1º uso: grava o estado inicial (o desfazer de erro relê daqui)
+  // sem isto o navegador pode apagar o localStorage sozinho (falta de espaço; Safari após 7 dias sem abrir o site)
+  navigator.storage?.persist?.().catch(() => {});
+  const BK = K + ".backup_em";
+  const semBackup = () => {  // texto do alerta, ou "" quando o backup está em dia (ou não há o que perder)
+    if (!S.itens.some(i => i.origem !== "pc")) return "";
+    let t = 0; try { t = +localStorage.getItem(BK) || 0; } catch {}
+    const dias = Math.floor((Date.now() - t) / 864e5);
+    return !t ? "você ainda não fez backup" : dias >= 7 ? `o último backup foi há ${dias} dias` : "";
+  };
+  function backup() {  // arquivo com tudo deste aparelho; volta pelo "Restaurar backup"
+    const a = document.createElement("a");
+    a.download = `dumpbox-backup-${iso(new Date())}.json`;
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ dumpbox: 1, backup: true, ...S })], { type: "application/json" }));
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
+    try { localStorage.setItem(BK, Date.now()); } catch {}
+    toast("Backup salvo nos Downloads. Guarde o arquivo fora do celular (Drive, e-mail, WhatsApp)."); estado();
+  }
 
   const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const p2 = n => String(n).padStart(2, "0");
@@ -109,7 +126,8 @@
 
   const R = [  // [método, regex, função(corpo, ...grupos)]
     ["GET", /^estado$/, () => ({ configurado: true, preparo: { pronto: false, erro: null },
-      aviso: "Modo celular: notas só neste aparelho, sem IA. Toque aqui para copiar do PC ou conectar." })],
+      aviso: semBackup() ? `⚠ Modo celular: seus dados só existem neste aparelho e ${semBackup()}. Toque aqui e salve um backup.`
+        : "Modo celular: notas só neste aparelho, sem IA. Toque aqui para backup, copiar do PC ou conectar." })],
     ["POST", /^(login|logout|setup)$/, () => ({ ok: true })],
     ["GET", /^sessao$/, () => ({ ok: true })],
     ["POST", /^capturas$/, b => {
@@ -233,6 +251,13 @@
   // ---- só no aparelho ----
   function importar(d) {  // cópia do PC (python -m dumpbox.exportar): substitui a cópia anterior, mantém o que nasceu aqui
     if (d?.dumpbox !== 1 || !Array.isArray(d.itens) || !Array.isArray(d.pastas)) throw new Error("não é uma cópia do dumpbox");
+    if (d.backup) {  // backup deste app: volta tudo como estava; o estado de agora fica em dumpbox.local.antes
+      try { localStorage.setItem(K + ".antes", JSON.stringify(S)); } catch {}
+      S = { seq: d.seq || Math.max(0, ...d.itens.map(i => i.id)) + 1, itens: d.itens, alt: d.alt || [], pastas: d.pastas };
+      salvar();
+      try { localStorage.setItem(BK, Date.now()); } catch {}
+      return d.itens.length;
+    }
     const meus = S.itens.filter(i => i.origem !== "pc"), base = Math.max(0, ...d.itens.map(i => i.id));
     meus.forEach((it, k) => { it.id = base + 1 + k; });  // ids do PC ficam iguais; os daqui vão para depois
     const slugs = new Set(d.pastas.map(p => p.slug));
@@ -247,13 +272,19 @@
     const arq = el("input"); arq.type = "file"; arq.accept = ".json,application/json"; arq.hidden = true;
     arq.onchange = async () => {
       fim();
-      try { const n = importar(JSON.parse(await arq.files[0].text())); toast(`${n} itens copiados do PC`); ultimo = ""; atualizar(); }
+      try { const d = JSON.parse(await arq.files[0].text()), n = importar(d); toast(d.backup ? `Backup restaurado: ${n} itens` : `${n} itens copiados do PC`); ultimo = ""; atualizar(); estado(); }
       catch (e) { toast(`Não consegui importar: ${e.message}`); }
     };
     v.onclick = fim;
+    const bk = el("div", "pe");
+    bk.append(botao("si ok", ["Salvar backup"], "Baixa um arquivo com tudo deste aparelho", () => { fim(); backup(); }),
+      botao("no", ["Restaurar backup"], "Escolha um dumpbox-backup-….json", () => arq.click()));
     pe.append(botao("no", ["Cancelar"], null, fim), botao("no", ["Conectar"], "Usar o PC direto (Tailscale)", () => { fim(); conectar(); }),
-      botao("si ok", ["Importar cópia"], "Arquivo copia-celular-*.json gerado no PC", () => arq.click()));
-    d.append(el("h4", "", "Dados do PC"), el("p", "", "Importar cópia: escolha o arquivo copia-celular-….json gerado no PC. Substitui a cópia anterior; o que você criou aqui fica."),
+      botao("no", ["Importar cópia"], "Arquivo copia-celular-*.json gerado no PC", () => arq.click()));
+    const aviso = semBackup();
+    d.append(el("h4", "", "Seus dados"), el("p", "", "Tudo fica só neste navegador. Se limpar os dados do site, trocar de celular ou de navegador, perde. "
+      + "Salve um backup de vez em quando e guarde fora do celular." + (aviso ? ` Agora: ${aviso}.` : "")), bk,
+      el("h4", "", "Dados do PC"), el("p", "", "Importar cópia: escolha o arquivo copia-celular-….json gerado no PC. Substitui a cópia anterior; o que você criou aqui fica."),
       el("p", "", "Conectar: usa o PC direto pelo Tailscale, com IA."), arq, pe);
     document.body.append(v, d);
   }

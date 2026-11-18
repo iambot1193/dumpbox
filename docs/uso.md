@@ -119,3 +119,10 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Dois botões de criar:** **+ Nova** abre o formulário completo (pasta, prazo, texto, check-list, repetir). **⚡ Rápida** (laranja) abre uma linha no topo: escreva e Enter cria e já deixa pronta para a próxima; `Pagar luz @ sexta 14h` põe prazo; "mais opções" leva o título para o formulário completo. Esc ou ✕ fecha.
 - **Check-list:** no Nova/Editar, "+ item de check-list" cria um campo por item: Enter cria o próximo, Backspace no campo vazio apaga, × tira. No card vira caixinhas marcáveis com contador (☑ 2/5); marcar grava na hora, sem concluir o card. (Fica salvo no texto como linhas `[ ] item`; digitar assim também funciona.)
 - **Celular em 2 colunas:** cards de criticidade alta/crítica ocupam a linha toda; os outros, meia. Puxe o canto (riscos no canto de baixo) para a direita = inteiro, para a esquerda = meio, para baixo/cima = altura (1 a 4). O tamanho vale também no PC (inteiro no celular = largura 2+ lá).
+
+## Backup no modo celular (demo do GitHub)
+- Os dados ficam só no navegador do aparelho. O app pede ao navegador armazenamento persistente (não apagar sozinho por falta de espaço), mas limpar os dados do site, trocar de celular ou de navegador ainda apaga.
+- Toque no aviso do topo: **Salvar backup** baixa `dumpbox-backup-AAAA-MM-DD.json` com tudo (itens, pastas, Lixeira). Guarde fora do celular (Drive, e-mail, WhatsApp).
+- **Restaurar backup** volta tudo como estava no arquivo (o estado de antes fica em `dumpbox.local.antes`).
+- Sem backup ou com backup de 7+ dias, o aviso do topo fica com ⚠ até salvar.
+- iPhone: use sempre o app instalado na tela inicial; o Safari comum é outro armazenamento e apaga após 7 dias sem abrir.

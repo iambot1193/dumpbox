@@ -195,6 +195,7 @@ function marcarSel() {
   const ids = [...sel], off = btn => { btn.disabled = !n; return btn; };
   b.replaceChildren(el("span", "n", n ? `${n} selecionado${n > 1 ? "s" : ""}` : "Toque nos cards para selecionar"),
     off(botao("", [ic("check"), "Feito"], "Marcar como feitos", () => lote("estado", "feito"))),
+    off(botao("", [ic("copy"), "Copiar"], "Copiar os cards como texto (Ctrl+C)", () => copiar(ids))),
     off(botao("", [ic("move"), "Mover"], "Mover para…", e => menuMover(e.currentTarget, ids, limparSel))),
     off(botao("", [ic("alert"), "Criticidade"], "Mudar criticidade", e => menuNivel(e.currentTarget, ids, limparSel))),
     off(botao("tr", [ic("trash"), "Excluir"], "Excluir (vai para a Lixeira)", () => lote("estado", "arquivado"))),
@@ -285,7 +286,80 @@ document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && cardsVisiveis().length) {
     e.preventDefault(); cardsVisiveis().forEach(c => sel.add(+c.dataset.id)); marcarSel();
   } else if (e.key === "Delete" && sel.size) lote("estado", "arquivado");  // reversível: vai para a Lixeira
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && sel.size && !String(getSelection())) { e.preventDefault(); copiar([...sel]); }
 });
+
+// ---- copiar e colar cards: texto de lista (Markdown) legível em qualquer lugar e que volta a virar card ----
+// - [ ] Título (Freelance · tarefa · baixa · prazo 2026-11-20 14:00 · repete semanal)
+//   texto do card, recuado
+const NIVEL_DE = Object.fromEntries(NIVEIS.map(([v, n]) => [norm(n), v]));
+function cardsEmTexto(its) {
+  return its.map(i => {
+    const meta = [NOME[pasta(i)], i.tipo, nivel(i)[1], i.prazo_em && "prazo " + i.prazo_em.replace("T", " "), REPETE[i.repete] && "repete " + i.repete].filter(Boolean);
+    const det = (i.detalhe || "").trim();
+    return `- [${aberto(i) ? " " : "x"}] ${i.titulo} (${meta.join(" · ")})` + (det ? "\n" + det.split("\n").map(l => "  " + l).join("\n") : "");
+  }).join("\n");
+}
+function lerMeta(s) {  // etiqueta entre parênteses; algo que não é do dumpbox: null (os parênteses ficam no título)
+  const r = {}, partes = s.split(" · ").map(x => x.trim());
+  for (const [k, t] of partes.entries()) {
+    const n = norm(t), p = PASTAS.find(([, nome]) => norm(nome) === n);
+    if (p) r.contexto = p[0];
+    else if (TIPOS.includes(n)) r.tipo = n;
+    else if (NIVEL_DE[n]) r.prioridade = NIVEL_DE[n];
+    else if (/^prazo \d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(t)) r.prazo = t.slice(6).replace(" ", "T");
+    else if (/^repete (diario|semanal|mensal)$/.test(t)) r.repete = t.slice(7);
+    else if (!(k === 0 && partes.length > 1)) return null;  // 1º = pasta que não existe neste aparelho: vai para a atual
+  }
+  return r;
+}
+function textoEmCards(txt) {  // um card por linha; linha recuada (ou "> ") é texto do card de cima
+  const cards = [];
+  for (const linha of txt.replace(/\r/g, "").split("\n")) {
+    if (!linha.trim()) continue;
+    if (cards.length && /^(\s{2,}|\t|>)/.test(linha)) {
+      const c = cards.at(-1); c.detalhe = (c.detalhe ? c.detalhe + "\n" : "") + linha.replace(/^(\s{2}|\t|>\s?)/, "");
+      continue;
+    }
+    const m = linha.trim().match(/^(?:[-*•]\s+)?(?:\[([ xX])\]\s+)?(.*)$/);
+    let titulo = m[2].trim(), meta = {};
+    const p = titulo.match(/^(.*?)\s*\(([^()]*)\)$/), lido = p && p[1] && lerMeta(p[2]);
+    if (lido) { titulo = p[1].trim(); meta = lido; }
+    if (titulo) cards.push({ titulo: titulo.slice(0, 200), feito: !!m[1] && m[1] !== " ", ...meta });
+  }
+  return cards;
+}
+async function copiar(ids) {
+  const its = doId(ids), txt = cardsEmTexto(its), s = its.length > 1 ? "s" : "";
+  if (!its.length) return;
+  try { await navigator.clipboard.writeText(txt); toast(`${its.length} card${s} copiado${s}. Cole aqui (Colar) ou em qualquer app.`); }
+  catch { caixaTexto("Copiar", "Não consegui usar a área de transferência. Segure no texto e copie:", txt); }
+}
+async function colar(txt) {
+  if (txt == null) {
+    try { txt = await navigator.clipboard.readText(); }
+    catch { return caixaTexto("Colar", "Cole aqui (segure e Colar). Um card por linha:", "", colar); }
+  }
+  const cards = textoEmCards(txt || "").slice(0, 200);
+  if (!cards.length) return toast("Nada para colar: copie cards ou um texto (um card por linha).");
+  const destino = NOME[vista] ? vista : "outro", feitos = [];
+  let n = 0;
+  for (const c of cards) {
+    try {
+      const r = await api("/api/itens", { titulo: c.titulo, contexto: c.contexto || destino, tipo: c.tipo || "tarefa", prioridade: c.prioridade || null,
+        prazo: c.prazo || (vista === "hoje" ? "hoje" : null), repete: c.repete || null, detalhe: c.detalhe || null });
+      n++; if (c.feito) feitos.push(r.id);
+    } catch (e) { if (String(e.message) === "401") return; }
+  }
+  if (feitos.length) await api("/api/itens/editar", { ids: feitos, campo: "estado", valor: "feito" }).catch(() => {});
+  toast(n === cards.length ? `${n} card${n > 1 ? "s" : ""} colado${n > 1 ? "s" : ""}` : `${n} de ${cards.length} cards colados (o resto deu erro)`);
+  ultimo = ""; atualizar();
+}
+function caixaTexto(titulo, msg, valor, usar) {  // sem acesso à área de transferência: o texto numa caixa
+  const t = el("textarea", "caixa"); t.value = valor; t.rows = 8;
+  formulario(titulo, [el("p", "", msg), t], usar ? "Criar cards" : "Fechar", "ok", async () => usar && (() => usar(t.value)));
+  t.focus(); if (valor) t.select();
+}
 
 // ---- tarefa criada à mão (sem IA) ----
 function opcoes(s, lista, padrao) { for (const [v, t] of lista) { const o = el("option", "", t); o.value = v; s.append(o); } s.value = padrao; return s; }
@@ -297,8 +371,17 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
   const pastaS = opcoes(el("select"), PASTAS, it ? pasta(it) : NOME[vista] ? vista : "casa");
   const tipo = opcoes(el("select"), TIPOS.map(t => [t, t]), it?.tipo || "tarefa");
   const crit = opcoes(el("select"), it ? NIVEIS.map(([v, n]) => [v, n]) : [["", "automática"], ...NIVEIS.map(([v, n]) => [v, n])], it?.prioridade || "");
-  const prazo = el("input"); prazo.maxLength = 60; prazo.placeholder = it?.prazo_em ? `${txtPrazo(it.prazo_em)} (vazio = manter)` : "ex.: sexta 14h, amanhã, dia 20";
-  prazo.value = !it && vista === "hoje" ? "hoje" : "";
+  // prazo: calendário (dia + hora) ou texto ("sexta 14h"); o texto vence. Apagar o dia tira o prazo.
+  const dia = el("input"), hora = el("input"), prazo = el("input");
+  dia.type = "date"; hora.type = "time"; dia.setAttribute("aria-label", "Dia do prazo"); hora.setAttribute("aria-label", "Hora do prazo");
+  dia.value = it?.prazo_em ? it.prazo_em.slice(0, 10) : !it && vista === "hoje" ? horaLocal().slice(0, 10) : "";
+  hora.value = it?.prazo_em?.slice(11, 16) || "";
+  prazo.maxLength = 60; prazo.placeholder = "ex.: sexta 14h, amanhã, dia 20";
+  prazo.oninput = () => { if (prazo.value.trim()) dia.value = hora.value = ""; };
+  dia.oninput = () => { prazo.value = ""; };
+  hora.oninput = () => { prazo.value = ""; if (hora.value && !dia.value) dia.value = horaLocal().slice(0, 10); };
+  const prazoFinal = () => prazo.value.trim() || (dia.value ? dia.value + (hora.value ? "T" + hora.value : "") : "");
+  const det = el("textarea"); det.maxLength = 2000; det.rows = 3; det.placeholder = "Detalhes, links, passos… (opcional)"; det.value = it?.detalhe || "";
   const rep = opcoes(el("select"), [["", "não repete"], ...Object.entries(REPETE)], it?.repete || "");
   if (it) titulo.value = it.titulo || "";
   const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
@@ -308,23 +391,25 @@ function novaTarefa(it) {  // com it: edita o card (só manda o que mudou)
     e.preventDefault(); si.disabled = true;
     try {
       if (it) {
-        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazo.value.trim(), repete: rep.value };
-        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: "", repete: it.repete };
+        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazoFinal(), repete: rep.value, detalhe: det.value.trim() };
+        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete, detalhe: it.detalhe };
         for (const k in m) if (m[k] === (antes[k] || "")) delete m[k];
+        if (m.prazo === "") m.prazo = "limpar";  // tinha prazo e o dia foi apagado
         if (Object.keys(m).length) {
           const r = await api(`/api/itens/${it.id}/editar`, { mudancas: m });
           if (r.grupo) { (vistos ||= new Set()).add(r.grupo); toast(r.descricao, r.grupo); }
         }
         fim(); ultimo = ""; return atualizar();
       }
-      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazo.value || null, repete: rep.value || null });
+      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: det.value.trim() || null });
       fim(); toast(r.descricao); ultimo = ""; atualizar();
     } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
   const linha2 = el("div", "duas"); linha2.append(campo("Pasta", pastaS), campo("Tipo", tipo));
-  const linha3 = el("div", "duas"); linha3.append(campo("Prazo", prazo), campo("Criticidade", crit));
+  const linha3 = el("div", "duas"); linha3.append(campo("Prazo: dia", dia), campo("hora (opcional)", hora));
+  const linha4 = el("div", "duas"); linha4.append(campo("ou escreva o prazo", prazo), campo("Criticidade", crit));
   pe.append(no, si);
-  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), linha2, linha3, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), linha2, linha3, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----
@@ -362,6 +447,7 @@ function apagarPasta(slug) {
   });
 }
 const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefa à mão", () => novaTarefa());
+const botaoColar = () => botao("bcolar", [ic("paste"), "Colar"], "Criar cards do que foi copiado (ou Ctrl+V fora da caixa)", () => colar());
 const botaoSel = () => botao("bsel" + (modoSel ? " on" : ""), ["Selecionar"], "Selecionar vários (no PC: Ctrl+clique, Shift+clique, Ctrl+A)",
   e => { modoSel = !modoSel; if (!modoSel) sel.clear(); e.currentTarget.classList.toggle("on", modoSel); marcarSel(); });
 
@@ -398,6 +484,17 @@ function arrastavel(card, it) {
     let clone = null, alvo = null, ph = null, cel = null, timer = null, segurou = false, antes = null, desliza = false, dx = 0;
     const grid = matchMedia(AREA_GRADE).matches && gradeAtual ? card.closest(".grid") : null, t = tam(it);
 
+    // faixa que aparece atrás do card ao deslizar: fraca até o ponto de concluir, cheia (e vibra) depois dele
+    const lim = Math.min(110, r.width * .35);
+    let faixa = null, passou = false;
+    const rastro = x => {
+      if (!faixa) {
+        faixa = el("div", "rastro"); faixa.append(ic(aberto(it) ? "check" : "retry"), el("span", "", aberto(it) ? "feito" : "reabrir"));
+        document.body.append(faixa);
+      }
+      faixa.style.cssText = `left:${r.left}px;top:${r.top}px;height:${r.height}px;width:${x}px`;
+      if (x > lim !== passou) { passou = x > lim; faixa.classList.toggle("pronto", passou); if (passou && navigator.vibrate) navigator.vibrate(12); }
+    };
     const marcar = novo => { if (alvo !== novo) { alvo?.classList.remove("over"); novo?.classList.add("over"); alvo = novo; } };
     const comecar = () => {
       gesto = true; fecharMenu();
@@ -421,7 +518,7 @@ function arrastavel(card, it) {
           dx = e.clientX - ini.clientX;
           // deslizar para a direita (antes de segurar) conclui ou reabre o card
           if (!desliza && dx > 12 && dx > Math.abs(e.clientY - ini.clientY) * 1.5) { desliza = gesto = true; clearTimeout(timer); card.classList.add("desliza"); }
-          if (desliza) { card.style.transform = `translateX(${Math.max(0, dx)}px)`; return; }
+          if (desliza) { card.style.transform = `translateX(${Math.max(0, dx)}px)`; rastro(Math.max(0, dx)); return; }
           if (dist > 10) limpar();  // mexeu antes de segurar: é rolagem
           return;
         }
@@ -449,16 +546,29 @@ function arrastavel(card, it) {
     const limpar = () => {
       clearTimeout(timer);
       document.removeEventListener("pointermove", mover); document.removeEventListener("pointerup", soltar); document.removeEventListener("pointercancel", cancelar);
-      clone?.remove(); ph?.remove(); alvo?.classList.remove("over"); card.classList.remove("saiu", "desliza"); card.style.transform = "";
+      clone?.remove(); ph?.remove(); faixa?.remove(); alvo?.classList.remove("over"); card.classList.remove("saiu", "desliza"); card.style.transform = "";
       document.body.style.cursor = "";
       gesto = false;
     };
     const cancelar = () => limpar();
     const soltar = () => {
-      const a = alvo?.dataset.alvo, troca = alvo?.dataset.id, c = cel, ativo = !!clone;
+      const a = alvo?.dataset.alvo, troca = alvo?.dataset.id, c = cel, ativo = !!clone, conclui = desliza && dx > lim, fx = conclui ? faixa : null;
+      if (conclui) faixa = null;  // a faixa fica para a animação de saída
       limpar();
       if (segurou || desliza) semClique = performance.now() + 300;
-      if (desliza) { if (dx > Math.min(110, r.width * .35)) editar(it.id, "estado", aberto(it) ? "feito" : "catalogado"); return; }
+      if (conclui) {  // card sai pela direita com a faixa cheia; depois salva (o redesenho tira o card)
+        gesto = true;
+        card.style.transform = `translateX(${dx}px)`; card.getBoundingClientRect();
+        card.style.transition = "transform .2s ease-in, opacity .2s"; card.style.transform = `translateX(${innerWidth}px)`; card.style.opacity = "0";
+        fx.style.transition = "width .2s ease-in"; fx.style.width = innerWidth - r.left + "px";
+        setTimeout(() => {
+          fx.remove(); gesto = false;
+          editar(it.id, "estado", aberto(it) ? "feito" : "catalogado")
+            .finally(() => { if (card.isConnected) card.style.transition = card.style.transform = card.style.opacity = ""; });  // deu erro: volta
+        }, 230);
+        return;
+      }
+      if (desliza) return;
       if (!ativo) return;
       if (troca) return trocar(it.id, +troca);
       arrastou = true; setTimeout(() => { arrastou = false; }, 0);  // o clique que vem depois do soltar não seleciona
@@ -525,6 +635,7 @@ function cartao(it, comPasta) {
   const meta = el("div", "meta"); meta.append(k, sig);
   const h = el("h3", "", it.titulo); h.title = it.titulo || "";
   a.append(meta, h);
+  if (it.detalhe) a.append(el("p", "det", it.detalhe));
   if (atrasado(it)) {
     const n = -dias(it.prazo_em), chip = el("span", "chip"), d = el("div", "due");
     chip.append(ic("alert"), `atrasado ${n} dia${n > 1 ? "s" : ""}`); d.append(chip); a.append(d);
@@ -534,7 +645,7 @@ function cartao(it, comPasta) {
   if (REPETE[it.repete]) { const d = el("div", "due"); d.append(ic("retry"), REPETE[it.repete]); a.append(d); }
   const acts = el("div", "acts"), dir = el("div");
   const feito = aberto(it);
-  dir.append(botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)), botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
+  dir.append(botao("cp", [ic("copy")], "Copiar", () => copiar(it.id)), botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)),botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
     botao("tr", [ic("trash")], "Excluir", () => editar(it.id, "estado", "arquivado")));
   acts.append(botao("ok", [ic(feito ? "check" : "retry")], feito ? "Marcar como feito" : "Reabrir", () => editar(it.id, "estado", feito ? "feito" : "catalogado")), dir);
   a.append(acts);
@@ -555,7 +666,7 @@ function vHoje(v) {
   const abertosHoje = hoje.filter(aberto), feitos = hoje.length - abertosHoje.length;
   const n = atras.length + abertosHoje.length, ps = new Set([...atras, ...abertosHoje].map(pasta)).size;
   const d = new Date();
-  v.append(cabecalho("Hoje", `${n} aberto${n === 1 ? "" : "s"} em ${ps} pasta${ps === 1 ? "" : "s"} · ${SEMANA[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`, botaoNova(), botaoSel(), chaveFeitos(feitos)));
+  v.append(cabecalho("Hoje", `${n} aberto${n === 1 ? "" : "s"} em ${ps} pasta${ps === 1 ? "" : "s"} · ${SEMANA[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`, botaoNova(), botaoColar(), botaoSel(), chaveFeitos(feitos)));
   const secao = (t, l) => {
     if (!l.length) return;
     v.append(el("div", "sec", `${t} · ${l.length}`));
@@ -579,7 +690,7 @@ function vPasta(v) {
   const ft = el("div", "ft");
   ft.append(botao(filtro ? "" : "on", ["Todas"], null, () => { filtro = null; render(); }));
   for (const [val, n] of NIVEIS) ft.append(botao(filtro === val ? "on" : "", [n], null, () => { filtro = val; render(); }));
-  v.append(cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length),
+  v.append(cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoColar(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length),
     ...(vista === "outro" ? [] : [botao("perigo", ["Apagar pasta"], "Apagar esta pasta (os itens vão para outra)", () => apagarPasta(vista))])));
   if (!lista.length) { v.append(el("p", "vazio", filtro ? "Nada com essa criticidade." : "Pasta vazia.")); gradeAtual = null; return; }
   gradeAtual = lista;
@@ -627,7 +738,7 @@ function vLixeira(v) {
 }
 function vBusca(v) {  // todas as palavras, sem acento, em qualquer pasta; feitos no fim
   const ps = norm($("busca").value).split(/\s+/).filter(Boolean);
-  const l = D.itens.filter(i => { const t = norm(`${i.titulo} ${NOME[pasta(i)] || ""} ${i.tipo}`); return ps.every(p => t.includes(p)); })
+  const l = D.itens.filter(i => { const t = norm(`${i.titulo} ${i.detalhe || ""} ${NOME[pasta(i)] || ""} ${i.tipo}`); return ps.every(p => t.includes(p)); })
     .sort((a, b) => aberto(b) - aberto(a) || urgencia(a, b));
   v.append(cabecalho("Busca", `${l.length} ite${l.length === 1 ? "m" : "ns"} para “${$("busca").value.trim()}”`));
   if (!l.length) return v.append(el("p", "vazio", "Nada encontrado."));
@@ -653,6 +764,8 @@ function desenhaNav() {
   const fim = el("div", "fim");
   fim.append(linha("revisar", [ic("alert"), "Revisar"], D.revisar.filter(c => c.status === "falhou").length),
     linha("lixeira", [ic("trash"), "Lixeira"], D.lixeira.length, true),
+    ...(temAvisos && Notification.permission === "default" ? [botao("sair", ["ligar avisos"], "Notificar quando uma tarefa passar do prazo", ativarAvisos)] : []),
+    botao("sair", ["ajuda"], "Ver o tutorial de novo", () => tutorial()),
     ...(window.DUMPBOX_LOCAL ? [] : [botao("sair", ["cópia p/ celular"], "Baixar cópia para importar no app do celular", () => { location.href = "api/copia"; })]),
     botao("sair", ["sair"], null, async () => { await api("/api/logout", {}); mostra("login"); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,
@@ -691,8 +804,58 @@ async function atualizar() {
       if (r.pastas?.length) { PASTAS = r.pastas.map(p => [p.slug, p.nome]); NOME = Object.fromEntries(PASTAS); }
       render();
     }
-    mostrarFila();
+    mostrarFila(); avisarVencidos();
+  } catch (e) { if (!/^(401|Failed to fetch)/.test(e.message)) console.error("atualizar:", e); }
+}
+
+// ---- avisos de tarefa vencida: notificação do navegador quando o prazo passa ----
+// ponytail: checa a cada atualização (5 s), então só avisa com o app aberto ou em segundo plano; app fechado
+// não avisa. Para isso: Web Push (VAPID) no servidor ou o Telegram da fase 3.
+const AVISADOS = "dumpbox.avisados", temAvisos = "Notification" in window;
+const vencido = i => aberto(i) && i.prazo_em && (dias(i.prazo_em) < 0 || (i.prazo_em.length > 10 && i.prazo_em <= horaLocal().slice(0, 16)));
+async function ativarAvisos() {
+  if (!temAvisos) return toast("Este navegador não tem notificações. No iPhone: instale o app na tela inicial.");
+  const p = await Notification.requestPermission();
+  toast(p === "granted" ? "Avisos ligados: tarefa que passar do prazo vira notificação." : "Avisos bloqueados. Libere as notificações nas configurações do site.");
+  render(); avisarVencidos();
+}
+async function avisarVencidos() {
+  if (!temAvisos || Notification.permission !== "granted") return;
+  let ja = {}; try { ja = JSON.parse(localStorage.getItem(AVISADOS) || "{}"); } catch {}
+  const novos = D.itens.filter(i => vencido(i) && ja[i.id] !== i.prazo_em);  // mudou o prazo: avisa de novo
+  if (!novos.length) return;
+  const agora = Object.fromEntries(D.itens.filter(vencido).map(i => [i.id, i.prazo_em]));
+  try { localStorage.setItem(AVISADOS, JSON.stringify(agora)); } catch { return; }  // sem guardar, avisaria a cada 5 s
+  const titulo = novos.length === 1 ? "Tarefa vencida" : `${novos.length} tarefas vencidas`;
+  const corpo = novos.slice(0, 4).map(i => `• ${i.titulo} (${txtPrazo(i.prazo_em)})`).join("\n") + (novos.length > 4 ? `\n… e mais ${novos.length - 4}` : "");
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();  // Android só mostra pelo service worker
+    if (reg) return await reg.showNotification(titulo, { body: corpo, tag: "dumpbox-vencidas", icon: "icon.svg" });
   } catch {}
+  try { new Notification(titulo, { body: corpo, tag: "dumpbox-vencidas" }); } catch {}
+}
+
+// ---- tutorial: abre sozinho no 1º acesso; depois, pelo "ajuda" da lateral ----
+const TOUR = "dumpbox.tour";
+const PASSOS = [
+  ["Bem-vindo ao dumpbox", "Despeje tudo na caixa de cima, solto e misturado, e toque Guardar. Com o PC, a IA separa em tarefas, prazos e pastas. O microfone dita por voz."],
+  ["Pastas e Hoje", "A lateral tem as pastas. Hoje junta o que vence hoje e o que está atrasado. O + cria uma pasta. A busca procura em todas."],
+  ["Cards", "✓ conclui, ou deslize o card para a direita. O lápis edita: texto, prazo no calendário (dia e hora) e repetição. As setas mudam de pasta."],
+  ["Vários de uma vez", "No celular: segure o dedo num card e toque nos outros. No PC: Ctrl+clique ou Shift+clique. A barra de baixo conclui, copia, move ou exclui todos."],
+  ["Copiar e colar", "Copiar põe os cards na área de transferência como texto. Colar (ou Ctrl+V fora da caixa) cria cards de qualquer texto: um por linha."],
+  ["Avisos", "Ligue os avisos para receber uma notificação quando uma tarefa passar do prazo (com o app aberto ou em segundo plano)."],
+];
+function tutorial(k = 0) {
+  dlgAberto = true; fecharMenu();
+  const v = el("div", "veu"), d = el("div", "dlg tour"), pe = el("div"), ult = k === PASSOS.length - 1;
+  const sai = () => { v.remove(); d.remove(); dlgAberto = false; };
+  const fim = () => { sai(); try { localStorage.setItem(TOUR, "1"); } catch {} };
+  pe.append(botao("no", [ult ? "Fechar" : "Pular"], null, fim));
+  if (ult && temAvisos && Notification.permission === "default") pe.append(botao("si ok", ["Ligar avisos"], null, () => { fim(); ativarAvisos(); }));
+  if (!ult) pe.append(botao("si ok", ["Próximo"], null, () => { sai(); tutorial(k + 1); }));
+  v.onclick = fim; d.onkeydown = e => { if (e.key === "Escape") fim(); };
+  d.append(el("small", "passo", `${k + 1} de ${PASSOS.length}`), el("h4", "", PASSOS[k][0]), el("p", "", PASSOS[k][1]), pe);
+  document.body.append(v, d); pe.lastChild.focus();
 }
 
 // ---- captura ----
@@ -747,7 +910,10 @@ $("foto").querySelector("input").onchange = e => { const arq = e.target.files[0]
 document.addEventListener("paste", e => {
   if (e.target.closest?.(".ai-in")) return;
   const arq = [...(e.clipboardData?.items || [])].find(i => i.kind === "file" && i.type.startsWith("image/"))?.getAsFile();
-  if (arq) { e.preventDefault(); enviarFoto(arq); }
+  if (arq) { e.preventDefault(); enviarFoto(arq); return; }
+  // texto colado fora de qualquer caixa: vira cards na pasta aberta
+  const txt = e.clipboardData?.getData("text/plain");
+  if (txt && !e.target.closest?.("input,textarea,[contenteditable]") && !dlgAberto && !$("app").hidden) { e.preventDefault(); colar(txt); }
 });
 // foto não vai sozinha: fica anexada (miniatura) até o Guardar, junto com o que for escrito como instrução
 let anexo = null;
@@ -788,7 +954,9 @@ async function iniciar() {
   if (e && !e.configurado) return mostra("setup");
   // 401 -> api() já mostrou o login; offline -> segue no app (a fila local guarda as notas)
   try { await api("/api/sessao"); } catch (e) { if (String(e.message) === "401") return; }
-  mostra("app"); await enviarFila(); atualizar();
+  mostra("app"); await enviarFila(); await atualizar();  // desenha antes do tutorial: com diálogo aberto atualizar() não redesenha
+  let visto = "1"; try { visto = localStorage.getItem(TOUR); } catch {}
+  if (!visto) tutorial();
 }
 window.addEventListener("online", () => { enviarFila().then(atualizar); });
 setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); } }, 5000);

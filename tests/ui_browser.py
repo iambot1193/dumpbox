@@ -76,6 +76,10 @@ try:
     with sync_playwright() as p:
         b = p.chromium.launch(channel="chrome", headless=True)
         ctx = b.new_context(viewport={"width": 1500, "height": 950}, service_workers="block")
+        ctx.add_init_script("localStorage.setItem('dumpbox.tour', '1')")  # tutorial do 1º acesso: testado no ui_local.py
+        # avisos já permitidos; a notificação fica registrada em vez de aparecer
+        ctx.add_init_script("""window.__avisos = []; window.Notification = class { static permission = 'granted';
+          static requestPermission() { return Promise.resolve('granted'); } constructor(t, o) { window.__avisos.push([t, o.body]); } }""")
         g = ctx.new_page()
         erros = []
         g.on("pageerror", lambda e: erros.append(str(e)))
@@ -90,6 +94,12 @@ try:
         ok(g.locator(".chip", has_text="atrasado 2 dias").count() == 1, "etiqueta atrasado")
         ok(g.evaluate("document.fonts.check('500 16px Barlow')"), "fonte própria carregou")
         g.screenshot(path=SAIDA / "1-hoje.png")
+        g.wait_for_function("window.__avisos.length > 0", timeout=4000)
+        av = g.evaluate("window.__avisos")
+        ok(len(av) == 1 and "vencida" in av[0][0] and "•" in av[0][1], f"aviso de tarefa vencida {av}")
+        time.sleep(5.5)
+        ok(g.evaluate("window.__avisos.length") == 1, "não repete o aviso a cada atualização")
+        ok(g.locator("#nav button", has_text="ligar avisos").count() == 0, "com avisos permitidos, some o “ligar avisos”")
 
         # Ctrl+V de um print (Win+Shift+S): vira captura de imagem na fila
         lista = base64.b64encode((RAIZ / "data" / "public" / "imagens" / "lista_01.png").read_bytes()).decode()  # checklist sintético
@@ -335,13 +345,13 @@ try:
         # ---- nova tarefa à mão ----
         g.click(".bnova")
         g.fill(".nova input >> nth=0", "Preparar slides da aula")
-        g.fill(".nova input >> nth=1", "quando der")
+        g.fill(".nova input[placeholder^='ex.: sexta']", "quando der")
         g.click(".nova .si")
         g.wait_for_selector(".nova .erro >> text=não entendi a data")
         ok(g.locator(".nova").count() == 1, "data inválida mostra erro e mantém o formulário")
-        g.fill(".nova input >> nth=1", "amanhã 10h")
+        g.fill(".nova input[placeholder^='ex.: sexta']", "amanhã 10h")
         g.screenshot(path=SAIDA / "10-nova.png")
-        g.press(".nova input >> nth=1", "Enter")
+        g.press(".nova input[placeholder^='ex.: sexta']", "Enter")
         g.wait_for_selector("#toast >> text=criado em Trabalho")
         novo_ = item("Preparar slides da aula")
         ok(novo_ is not None and novo_["contexto"] == "trabalho" and novo_["prazo_em"].endswith("T10:00") and novo_["prioridade"] == "alta",
@@ -391,11 +401,52 @@ try:
         g.click('[data-alvo="casa"]')
         ok(g.input_value("#busca") == "" and g.locator("h2:text-is('Casa')").count() == 1, "trocar de pasta limpa a busca")
 
+        # Editar: texto abaixo do título e prazo pelo calendário (dia + hora); apagar o dia tira o prazo
+        te = g.locator("#vista article.c h3").first.inner_text()
+        card(te).hover(); card(te).locator("button.ed").click()
+        g.fill("form.dlg textarea", "ligar antes\nlevar documentos")
+        g.fill("form.dlg input[type=date]", "2026-12-10"); g.fill("form.dlg input[type=time]", "14:30")
+        g.click(".nova .si"); g.wait_for_selector("form.dlg", state="detached"); time.sleep(.4)
+        ok(item(te)["detalhe"] == "ligar antes\nlevar documentos" and item(te)["prazo_em"] == "2026-12-10T14:30", "Editar grava texto e prazo do calendário")
+        ok(card(te).locator(".det").inner_text().startswith("ligar antes"), "texto aparece abaixo do título")
+        g.screenshot(path=SAIDA / "16-texto-no-card.png")
+        card(te).hover(); card(te).locator("button.ed").click()
+        ok(g.input_value("form.dlg input[type=date]") == "2026-12-10" and g.input_value("form.dlg input[type=time]") == "14:30", "Editar abre com o dia e a hora do prazo")
+        g.fill("form.dlg input[type=date]", "")
+        g.click(".nova .si"); g.wait_for_selector("form.dlg", state="detached"); time.sleep(.4)
+        ok(item(te)["prazo_em"] is None, "apagar o dia tira o prazo")
+        # copiar (Ctrl+C na seleção) e Colar: o texto volta a virar cards iguais
+        ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=URL)
+        tc = g.eval_on_selector_all("#vista article.c h3", "a=>a.map(e=>e.textContent)")[:2]
+        for t in tc: h3(t).click(modifiers=["Control"])
+        g.keyboard.press("Control+c")
+        g.wait_for_selector("#toast >> text=2 cards copiados")
+        clip = g.evaluate("navigator.clipboard.readText()")
+        ok(clip.count("\n- [") == 1 and all(f"] {t} (Casa · " in clip for t in tc), f"Ctrl+C copia os selecionados como lista {clip!r}")
+        g.keyboard.press("Escape")
+        g.click(".bcolar")
+        g.wait_for_selector("#toast >> text=2 cards colados")
+        conta = lambda t: c.execute("SELECT count(*) FROM item WHERE titulo=? AND estado!='arquivado'", (t,)).fetchone()[0]
+        copias = [c.execute("SELECT * FROM item WHERE titulo=? ORDER BY id DESC", (t,)).fetchone() for t in tc]
+        ok(all(conta(t) == 2 for t in tc) and all(x["contexto"] == "casa" for x in copias), "Colar cria os cards copiados")
+        ok(any(x["detalhe"] == "ligar antes\nlevar documentos" for x in copias) if te in tc else True, "texto do card vai junto na cópia")
+        # Ctrl+V de texto qualquer fora da caixa: um card por linha, etiqueta do dumpbox lida
+        g.evaluate("""() => { const dt = new DataTransfer(); dt.setData('text/plain', '- [ ] Colado A (Casa · ideia · alta · prazo 2026-12-01 09:00)\\n  com detalhe\\n• Colado B (sem etiqueta)\\n- [x] Colado C');
+          document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }""")
+        g.wait_for_function("() => !/2 cards colados/.test(document.querySelector('#toast').innerText)", timeout=15000)
+        ok("3 cards colados" in g.inner_text("#toast"), f"Ctrl+V cola 3 cards ({g.inner_text('#toast')})")
+        A, B, C = item("Colado A"), item("Colado B (sem etiqueta)"), item("Colado C")
+        ok(A and A["tipo"] == "ideia" and A["prioridade"] == "alta" and A["prazo_em"] == "2026-12-01T09:00" and A["detalhe"] == "com detalhe",
+           "colar lê pasta, tipo, criticidade, prazo e texto")
+        ok(B and B["contexto"] == "casa" and C and C["estado"] == "feito", "linha sem etiqueta vai para a pasta aberta; [x] entra feito")
+        g.screenshot(path=SAIDA / "17-colado.png")
+
         ok(erros == [], f"console limpo {erros}")
         ctx.close()
 
         # celular: toque real pelo protocolo do Chrome
         ctx = b.new_context(viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True, device_scale_factor=2, service_workers="block")
+        ctx.add_init_script("localStorage.setItem('dumpbox.tour', '1')")
         m = ctx.new_page()
         erros2 = []
         m.on("pageerror", lambda e: erros2.append(str(e)))
@@ -472,6 +523,8 @@ try:
         for i in range(1, 7):
             toque("touchMove", [{"x": xz + 30 * i, "y": yz + 2}]); time.sleep(.02)
         ok("desliza" in (cs.nth(0).get_attribute("class") or ""), "card acompanha o dedo ao deslizar")
+        ok(m.locator(".rastro.pronto").count() == 1 and "feito" in m.inner_text(".rastro"), "faixa “feito” aparece cheia ao passar do ponto")
+        m.screenshot(path=SAIDA / "18-celular-deslizar.png")
         toque("touchEnd", [])
         m.wait_for_selector("#toast >> text=marcado como feito", timeout=4000)
         ok(item(tz)["estado"] == "feito", "deslizar para a direita marca como feito")

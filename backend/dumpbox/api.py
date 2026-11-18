@@ -119,6 +119,7 @@ class NovoItem(BaseModel):
     prioridade: chat.Prioridade | None = None  # None = regra pelo prazo
     prazo: str | None = Field(default=None, max_length=60)  # texto livre ("sexta 14h"), resolvido por regra
     repete: Literal["", "diario", "semanal", "mensal"] | None = None
+    detalhe: str | None = Field(default=None, max_length=2000)  # texto abaixo do título
 
 
 class Posicao(BaseModel):
@@ -254,27 +255,33 @@ def editar_itens(body: Edicao, c=Depends(conexao)):
 
 
 class EdicaoCard(BaseModel):
-    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete"], str] = Field(min_length=1)
+    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete", "detalhe"], str] = Field(min_length=1)
 
 
 @app.post("/api/itens/{item_id}/editar", dependencies=[Depends(exige_login)])
 def editar_card(item_id: int, body: EdicaoCard, c=Depends(conexao)):
-    """Botão Editar do card: vários campos de um item, tudo ou nada, um Desfazer."""
-    validas, repete = [], body.mudancas.pop("repete", None)
-    if repete is not None and repete not in ("", *chat.REPETE):
+    """Botão Editar do card: vários campos de um item, tudo ou nada, um Desfazer.
+    repete, detalhe e prazo "limpar" não passam pelo validador da IA (ela não mexe neles)."""
+    validas, m = [], body.mudancas
+    diretos = {k: m.pop(k) for k in ("repete", "detalhe") if k in m}
+    if m.get("prazo") == "limpar":
+        m.pop("prazo"); diretos["prazo"] = None
+    if diretos.get("repete") not in (None, "", *chat.REPETE):
         raise HTTPException(422, "repete: use diario, semanal ou mensal")
+    if len(diretos.get("detalhe") or "") > 2000:
+        raise HTTPException(422, "texto: até 2000 caracteres")
     for campo, valor in body.mudancas.items():
         try:
             validas.append(chat.validar(c, chat.Acao(tipo=campo, item_id=item_id, valor=valor), datetime.now())[0])
         except ValueError as e:
             raise HTTPException(404 if "inexistente" in str(e) else 422, f"{campo}: {e}")
     grupo = str(uuid.uuid4())
-    if repete is not None and not c.execute("SELECT 1 FROM item WHERE id=?", (item_id,)).fetchone():
+    if diretos and not c.execute("SELECT 1 FROM item WHERE id=?", (item_id,)).fetchone():
         raise HTTPException(404, "item inexistente")
     n = sum(chat.aplicar(c, a, grupo) for a in validas)
-    if repete is not None:
-        n += chat._mudar(c, item_id, "repete", repete or None, grupo, None)
-        c.commit()
+    for campo, valor in diretos.items():
+        n += chat._mudar(c, item_id, campo, (valor or "").strip() or None, grupo, None)
+    c.commit()
     if not n:
         return {"grupo": None, "descricao": None, "n": 0}
     titulo = c.execute("SELECT titulo FROM item WHERE id=?", (item_id,)).fetchone()["titulo"]
@@ -291,8 +298,8 @@ def criar_item(body: NovoItem, c=Depends(conexao)):
         raise HTTPException(422, "título vazio")
     if not pasta:
         raise HTTPException(422, "pasta inexistente")
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?", texto_prazo):  # já resolvido (vindo do modo celular)
-        prazo_em = texto_prazo
+    if re.match(r"\d{4}-", texto_prazo):  # já resolvido (calendário, modo celular, cards colados)
+        prazo_em = chat.data_iso(texto_prazo)
     else:
         prazo_em = rules.resolver_prazo(texto_prazo, agora) if texto_prazo else None
     if texto_prazo and not prazo_em:
@@ -300,10 +307,11 @@ def criar_item(body: NovoItem, c=Depends(conexao)):
     cid = str(uuid.uuid4())
     db.nova_captura(c, cid, titulo, "manual")
     c.execute("UPDATE captura SET status='ok' WHERE id=?", (cid,))
-    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em,repete) "
-                    "VALUES(?,?,?,?,?,?,?,'[]',?,?)",
+    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em,repete,detalhe) "
+                    "VALUES(?,?,?,?,?,?,?,'[]',?,?,?)",
                     (cid, body.tipo, titulo, pasta, texto_prazo or None, prazo_em,
-                     body.prioridade or rules.prioridade(prazo_em, titulo, agora), db.agora(), body.repete or None)).lastrowid
+                     body.prioridade or rules.prioridade(prazo_em, titulo, agora), db.agora(), body.repete or None,
+                     (body.detalhe or "").strip() or None)).lastrowid
     c.commit()
     return {"id": iid, "descricao": f"“{titulo}” criado em {db.nome_pasta(pasta)}"}
 

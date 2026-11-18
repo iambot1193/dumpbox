@@ -55,6 +55,18 @@ with sync_playwright() as p:
     g.wait_for_selector("#nav .fold")
     ok("Modo celular" in g.inner_text("#prep"), "aviso de modo celular no topo")
     ok(g.locator("#fab").is_hidden() and g.locator("#foto").is_hidden(), "sem chat e sem foto (precisam da IA)")
+    # tutorial do 1º acesso: passa pelos passos, fecha e não volta; "ajuda" reabre
+    g.wait_for_selector(".tour")
+    ok(g.inner_text(".tour .passo") == "1 de 6", "tutorial abre no 1º acesso")
+    for _ in range(5):
+        g.locator(".tour button", has_text="Próximo").click()
+    ok("Avisos" in g.inner_text(".tour h4"), "último passo fala dos avisos")
+    g.locator(".tour button", has_text="Fechar").click()
+    g.reload(); g.wait_for_selector("#nav .fold"); time.sleep(.5)
+    ok(g.locator(".tour").count() == 0, "tutorial não volta depois de visto")
+    g.locator("#nav button", has_text="ajuda").click()
+    ok(g.locator(".tour").count() == 1, "“ajuda” reabre o tutorial")
+    g.locator(".tour button", has_text="Pular").click()
 
     g.fill("#txt", "comprar pilhas\nAA e AAA")
     g.click("#guardar")
@@ -71,6 +83,13 @@ with sync_playwright() as p:
         got = next(i for i in g.evaluate(api, ["/api/itens", None])[1]["itens"] if i["id"] == it["id"])["prazo_em"]
         ok(got == resolver_prazo(t, datetime.now()), f"prazo “{t}” igual ao rules.py ({got})")
     ok(g.evaluate(api, ["/api/itens", {"titulo": "x", "contexto": "casa", "tipo": "tarefa", "prazo": "qualquer dia"}])[0] == 422, "data não entendida dá 422")
+    # calendário (ISO), data que não existe, "limpar"; texto do card
+    edita = lambda m: g.evaluate(api, [f"/api/itens/{it['id']}/editar", {"mudancas": m}])[0]
+    prazo_de = lambda: next(i for i in g.evaluate(api, ["/api/itens", None])[1]["itens"] if i["id"] == it["id"])
+    ok(edita({"prazo": "2026-12-10T14:30", "detalhe": " código de barras \n"}) == 200 and prazo_de()["prazo_em"] == "2026-12-10T14:30"
+       and prazo_de()["detalhe"] == "código de barras", "prazo do calendário e texto do card")
+    ok(edita({"prazo": "2026-02-31"}) == 422 and edita({"prazo": "limpar"}) == 200 and prazo_de()["prazo_em"] is None, "data inexistente dá 422; limpar tira o prazo")
+    edita({"prazo": "semana que vem"})
 
     st, r = g.evaluate(api, ["/api/itens/editar", {"ids": [it["id"]], "campo": "estado", "valor": "feito"}])
     ok(r["n"] == 1 and "feito" in r["descricao"], "marca feito")
@@ -149,9 +168,9 @@ with sync_playwright() as p:
     g.wait_for_selector("#toast >> text=enviado", timeout=10000)
     c = db.conectar()
     cap = c.execute("SELECT texto FROM captura WHERE texto LIKE 'comprar pilhas%'").fetchone()
-    tarefa = c.execute("SELECT contexto, prazo_em FROM item WHERE titulo='Pagar boleto'").fetchone()
+    tarefa = c.execute("SELECT contexto, prazo_em, detalhe FROM item WHERE titulo='Pagar boleto'").fetchone()
     ok(cap and cap[0] == "comprar pilhas\nAA e AAA","nota intacta vai para a IA do PC (texto completo)")
-    ok(tarefa and tuple(tarefa) == ("financas", resolver_prazo("semana que vem", datetime.now())), "tarefa editada vai com pasta e prazo")
+    ok(tarefa and tuple(tarefa) == ("financas", resolver_prazo("semana que vem", datetime.now()), "código de barras"), "tarefa editada vai com pasta, prazo e texto")
     ok(not c.execute("SELECT 1 FROM item WHERE titulo LIKE 'Item do PC%'").fetchone(), "cópia do PC não volta para o PC")
     ok([i["titulo"] for i in g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens") if i["estado"] == "catalogado"] == ["Item do PC 1", "Item do PC 2"],
        "dos abertos, só a cópia fica no aparelho (feitos e Lixeira não sobem)")

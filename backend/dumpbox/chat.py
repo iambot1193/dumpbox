@@ -23,7 +23,7 @@ from .schema import Tipo
 Prioridade = Literal["critica", "alta", "media", "baixa"]
 _DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 _COLUNA = {"estado": "estado", "prazo": "prazo_em", "contexto": "contexto", "prioridade": "prioridade",
-           "titulo": "titulo", "tipo": "tipo", "repete": "repete"}  # whitelist: nome de coluna nunca vem do modelo
+           "titulo": "titulo", "tipo": "tipo", "repete": "repete", "detalhe": "detalhe"}  # whitelist: nome de coluna nunca vem do modelo
 REPETE = {"diario": "todo dia", "semanal": "toda semana", "mensal": "todo mês"}
 _NIVEL = {"critica": "crítica", "alta": "alta", "media": "média", "baixa": "baixa"}
 _EXCLUIR = {"excluido", "excluído", "apagado", "deletado", "removido", "excluir", "apagar"}  # viram "arquivado"
@@ -120,6 +120,17 @@ def _ollama(mensagens: list[dict]) -> str:
     return r.json()["message"]["content"]
 
 
+def data_iso(v: str) -> str | None:
+    """Prazo já resolvido (calendário da tela, modo celular, colar cards): AAAA-MM-DD[THH:MM] válido ou None."""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?", v):
+        return None
+    try:
+        datetime.fromisoformat(v)
+    except ValueError:
+        return None
+    return v
+
+
 def validar(c, a: Acao, agora: datetime) -> tuple[Acao, str]:
     """Confere a ação contra o banco e devolve (ação normalizada, descrição). ValueError se inválida."""
     v = (a.valor or "").strip()
@@ -142,7 +153,7 @@ def validar(c, a: Acao, agora: datetime) -> tuple[Acao, str]:
             raise ValueError("estado inválido")
         return a.model_copy(update={"valor": v}), f"Marcar “{titulo}” como {v}"
     if a.tipo == "prazo":
-        iso = resolver_prazo(v, agora)
+        iso = data_iso(v) if re.match(r"\d{4}-", v) else resolver_prazo(v, agora)  # ISO: do calendário
         if not iso:
             raise ValueError("data não entendida")
         return a.model_copy(update={"valor": iso}), f"Mudar prazo de “{titulo}” para {iso.replace('T', ' ')}"
@@ -173,6 +184,10 @@ def _frase(campo: str, titulo: str, antes: str | None, depois: str) -> str:
         return f"“{titulo}” agora é {_NIVEL.get(depois, depois)}"
     if campo == "repete":
         return f"“{titulo}” " + (f"repete {REPETE[depois]}" if depois else "não repete mais")
+    if campo == "detalhe":
+        return f"Texto de “{titulo}” " + ("editado" if depois else "apagado")
+    if campo == "prazo" and not depois:
+        return f"“{titulo}” ficou sem prazo"
     return f"{campo} de “{titulo}”: {antes or '-'} → {depois}"
 
 

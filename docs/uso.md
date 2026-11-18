@@ -104,3 +104,11 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Busca:** campo abaixo da caixa de nota; procura em todas as pastas, sem diferenciar acento e maiúscula. Trocar de pasta limpa a busca.
 - **Repetir:** no Nova/Editar, "Repetir" todo dia, toda semana ou todo mês. Ao concluir, a próxima é criada com o prazo seguinte (mês curto usa o último dia). O Desfazer reabre a antiga e manda a nova para a Lixeira.
 - **Cópia para o celular:** botão "cópia p/ celular" na lateral (só no PC) baixa o arquivo para Importar cópia no modo celular.
+
+## Novidades (18/11/2026)
+- **Tutorial:** abre no 1º acesso; depois pelo "ajuda" da lateral.
+- **Texto do card:** campo abaixo do título no Nova/Editar; aparece no card e entra na busca.
+- **Prazo pelo calendário:** dia e hora (opcional) no Nova/Editar; o campo escrito ("sexta 14h") vale se preenchido. Apagar o dia tira o prazo.
+- **Avisos de atraso:** "ligar avisos" (lateral ou último passo do tutorial). Tarefa que passa do prazo vira notificação, uma vez por prazo. Só com o app aberto ou em segundo plano.
+- **Deslizar para concluir:** faixa verde atrás do card; ao passar do ponto fica marcada e o card sai deslizando.
+- **Copiar e colar cards:** ícone de copiar no card, ou "Copiar" na barra da seleção (Ctrl+C). Vai como texto: `- [ ] Título (Pasta · tipo · criticidade · prazo AAAA-MM-DD HH:MM)`, com o texto do card recuado abaixo. "Colar" (ou Ctrl+V fora das caixas) cria um card por linha de qualquer texto; a etiqueta é lida, `[x]` entra feito, sem pasta vai para a pasta aberta.

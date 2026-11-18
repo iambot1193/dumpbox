@@ -36,6 +36,12 @@
     const h = t.match(/\b(\d{1,2})(?::|h)(\d{2})?\b/);
     return h && +h[1] < 24 && +(h[2] || 0) < 60 ? `${iso(d)}T${p2(+h[1])}:${p2(+(h[2] || 0))}` : iso(d);
   }
+  function dataIso(v) {  // como chat.data_iso: AAAA-MM-DD[THH:MM] que existe no calendário
+    const m = (v || "").match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/);
+    if (!m) return null;
+    const d = new Date(+m[1], m[2] - 1, +m[3]);
+    return d.getMonth() === m[2] - 1 && d.getDate() === +m[3] && (!m[4] || (+m[4] < 24 && +m[5] < 60)) ? v : null;
+  }
   function prioridade(p, titulo) {
     if (norm(titulo).includes("urgente")) return "alta";
     if (!p) return "baixa";
@@ -55,7 +61,12 @@
   }
   function valida(it, campo, valor) {  // devolve o valor final da coluna (como chat.validar)
     if (!it) throw new Erro(404, "item inexistente");
-    if (campo === "prazo") { const p = prazo(valor || ""); if (!p) throw new Erro(422, `não entendi a data “${valor}”`); return ["prazo_em", p]; }
+    if (campo === "prazo") {
+      if (valor === "limpar") return ["prazo_em", null];
+      const p = /^\d{4}-/.test(valor || "") ? dataIso(valor) : prazo(valor || "");
+      if (!p) throw new Erro(422, `não entendi a data “${valor}”`); return ["prazo_em", p];
+    }
+    if (campo === "detalhe") { if ((valor || "").length > 2000) throw new Erro(422, "texto: até 2000 caracteres"); return ["detalhe", (valor || "").trim() || null]; }
     if (campo === "contexto") { const s = slugDe(valor); if (!s) throw new Erro(422, "pasta inexistente"); return ["contexto", s]; }
     if (campo === "estado" && !["feito", "arquivado", "catalogado"].includes(valor)) throw new Erro(422, "estado inválido");
     if (campo === "prioridade" && !NIVEL[valor]) throw new Erro(422, "criticidade inválida");
@@ -68,7 +79,8 @@
     if (col === "estado") return `${t} ` + { feito: "marcado como feito", arquivado: "foi para a Lixeira", catalogado: "voltou para a pasta" }[v];
     if (col === "contexto") return `${t} foi para ${nomePasta(v)}`;
     if (col === "prioridade") return `${t} agora é ${NIVEL[v]}`;
-    if (col === "prazo_em") return `Prazo de ${t}: ${v.replace("T", " ")}`;
+    if (col === "prazo_em") return v ? `Prazo de ${t}: ${v.replace("T", " ")}` : `${t} ficou sem prazo`;
+    if (col === "detalhe") return `Texto de ${t} ` + (v ? "editado" : "apagado");
     if (col === "repete") return `${t} ` + (v ? `repete ${REP[v]}` : "não repete mais");
     return `${t} editado`;
   }
@@ -114,9 +126,9 @@
       const titulo = (b.titulo || "").trim(), pasta = slugDe(b.contexto), txt = (b.prazo || "").trim();
       if (!titulo) throw new Erro(422, "título vazio");
       if (!pasta) throw new Erro(422, "pasta inexistente");
-      const p = txt ? prazo(txt) : null;
+      const p = !txt ? null : /^\d{4}-/.test(txt) ? dataIso(txt) : prazo(txt);
       if (txt && !p) throw new Erro(422, `não entendi a data “${txt}”. Tente “sexta 14h”, “amanhã” ou “dia 20”.`);
-      const it = novoItem(titulo, { tipo: b.tipo, contexto: pasta, prazo_em: p, prioridade: b.prioridade || prioridade(p, titulo), repete: b.repete || null });
+      const it = novoItem(titulo, { tipo: b.tipo, contexto: pasta, prazo_em: p, prioridade: b.prioridade || prioridade(p, titulo), repete: b.repete || null, detalhe: (b.detalhe || "").trim().slice(0, 2000) || null });
       return { id: it.id, descricao: `“${it.titulo}” criado em ${nomePasta(pasta)}` };
     }],
     ["POST", /^itens\/editar$/, b => {
@@ -190,8 +202,8 @@
         const envia = (rota, corpo) => fetchRede(PC + "/api/" + rota, comToken({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
         try {
           let r = nota ? await envia("capturas", { id: it.captura_id, texto: it.texto, criado_em: it.criado_em })  // intacta: a IA do PC classifica
-            : await envia("itens", { titulo: it.titulo, contexto: nomePasta(it.contexto), tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null });
-          if (r.status === 422 && !nota) r = await envia("itens", { titulo: it.titulo, contexto: "outro", tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null });
+            : await envia("itens", { titulo: it.titulo, contexto: nomePasta(it.contexto), tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null });
+          if (r.status === 422 && !nota) r = await envia("itens", { titulo: it.titulo, contexto: "outro", tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null });
           if (!r.ok) break;
         } catch { break; }
         S.itens = S.itens.filter(i => i !== it); n++;

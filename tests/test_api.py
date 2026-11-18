@@ -566,6 +566,19 @@ def test_repete_e_copia():
     r = c.get("/api/copia")
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
     assert any(i["titulo"] == "Pagar aluguel!" for i in r.json()["itens"]) and r.json()["dumpbox"] == 1
+    # texto do card e prazo pelo calendário (ISO); dia apagado = "limpar"; data que não existe = 422
+    item = lambda: next(i for i in lista()["itens"] if i["id"] == iid)
+    r = c.post(f"/api/itens/{iid}/editar", json={"mudancas": {"detalhe": " boleto no e-mail \n", "prazo": "2026-12-10T14:30"}}).json()
+    assert r["n"] == 2 and item()["detalhe"] == "boleto no e-mail" and item()["prazo_em"] == "2026-12-10T14:30"
+    r = c.post(f"/api/itens/{iid}/editar", json={"mudancas": {"prazo": "limpar", "detalhe": ""}}).json()
+    assert item()["prazo_em"] is None and item()["detalhe"] is None
+    c.post("/api/desfazer", json={"grupo": r["grupo"]})
+    assert item()["prazo_em"] == "2026-12-10T14:30" and item()["detalhe"] == "boleto no e-mail"
+    assert c.post(f"/api/itens/{iid}/editar", json={"mudancas": {"prazo": "2026-02-31"}}).status_code == 422
+    assert c.post("/api/itens", json={"titulo": "Pagar aluguel x", "prazo": "2026-13-01"}).status_code == 422
+    nid = c.post("/api/itens", json={"titulo": "Pagar aluguel colado", "contexto": "casa", "detalhe": "linha 1\nlinha 2"}).json()["id"]
+    assert next(i for i in lista()["itens"] if i["id"] == nid)["detalhe"] == "linha 1\nlinha 2"
+    assert "detalhe" in c.get("/api/copia").json()["itens"][0]
     b = db.conectar()  # limpa: os outros testes contam itens e Lixeira
     ids = [x[0] for x in b.execute("SELECT id FROM item WHERE titulo LIKE 'Pagar aluguel%'")]
     b.executemany("DELETE FROM alteracao WHERE item_id=?", [(i,) for i in ids])

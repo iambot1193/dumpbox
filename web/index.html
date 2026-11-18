@@ -81,14 +81,17 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .c.sel{outline:2px solid var(--txt);outline-offset:-2px;background:#2e3327}
 .c.sel::after{content:"✓";position:absolute;right:26px;bottom:4px;font:700 14px var(--mono);color:var(--txt)}
 .qtd{position:absolute;right:-10px;top:-10px;min-width:26px;height:26px;padding:0 6px;background:var(--txt);color:var(--ink);font:700 14px/26px var(--mono);text-align:center}
-.bnova,.bsel{border:1px solid var(--line);padding:4px 10px;color:var(--txt)}.bnova b{color:var(--sig);font-size:17px;line-height:1}
-.bnova:hover,.bsel:hover,.bsel.on{border-color:var(--txt)}.bsel.on{background:var(--txt);color:var(--ink)}
+.bnova,.bcolar,.bsel{border:1px solid var(--line);padding:4px 10px;color:var(--txt)}.bnova b{color:var(--sig);font-size:17px;line-height:1}
+.bnova:hover,.bcolar:hover,.bsel:hover,.bsel.on{border-color:var(--txt)}.bsel.on{background:var(--txt);color:var(--ink)}
 #barra{position:fixed;left:276px;bottom:18px;z-index:31;display:flex;align-items:center;flex-wrap:wrap;gap:4px;background:var(--txt);color:var(--ink);padding:6px 8px;font:13.5px var(--mono);max-width:calc(100vw - 380px)}
 #barra .n{font-weight:700;padding:0 8px}#barra button{min-height:36px;padding:0 10px;border:1px solid transparent}
 #barra button:hover:not(:disabled){border-color:var(--ink)}#barra button:disabled{opacity:.4;cursor:default}#barra .tr{color:#a3001b}
 .com-barra #toast{bottom:74px}
 .nova label{display:block;margin-bottom:10px;min-width:0}.nova label span{display:block;font:12.5px var(--mono);color:#55574a;margin-bottom:3px}
 .nova input,.nova select{width:100%;height:40px;border:1px solid #9a9784;background:#fff;color:var(--ink);font:15px Barlow,sans-serif;padding:0 9px}
+.nova textarea{width:100%;border:1px solid #9a9784;background:#fff;color:var(--ink);font:15px/1.3 Barlow,sans-serif;padding:7px 9px;resize:vertical;display:block}
+.dlg .caixa{min-height:150px;font:13px/1.35 var(--mono)}.tour .passo{font:12.5px var(--mono);color:#55574a}
+.bcolar .i{margin-right:4px}
 .nova .duas{display:grid;grid-template-columns:1fr 1fr;gap:10px;justify-content:stretch}
 .nova .erro{color:#a3001b;font-size:14px;margin:0 0 8px;min-height:0}
 .dlg .si.ok{background:var(--sig);color:var(--ink)}
@@ -103,6 +106,9 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .critica .sig{color:var(--late);font-weight:700}.critica .sig .on{background:var(--late)}
 .c h3{font-size:21px;line-height:1.14;font-weight:500;margin:6px 0 7px;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--l,2);overflow-wrap:anywhere}
 .c.w2 h3{font-size:30px;font-weight:700;letter-spacing:-.3px;margin:4px 0 6px}
+.c .det{font-size:14.5px;line-height:1.3;color:#c9c6b4;margin:0 0 6px;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.rastro{position:fixed;z-index:5;display:flex;align-items:center;gap:6px;padding-left:12px;overflow:hidden;white-space:nowrap;background:#1f3324;color:var(--ok);font:700 14px var(--mono);pointer-events:none}
+.rastro .i{font-size:22px}.rastro.pronto{background:var(--ok);color:var(--ink)}
 .due{display:flex;align-items:center;gap:6px;font:13.5px var(--mono)}
 .acts{display:flex;justify-content:space-between;margin-top:auto}
 .acts div{display:flex}.acts button{width:44px;height:44px;justify-content:center;font-size:20px}
@@ -158,6 +164,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 
 .veu{position:fixed;inset:0;background:rgba(5,6,4,.72);z-index:45}
 .dlg{position:fixed;left:50%;top:30%;transform:translateX(-50%);width:min(380px,calc(100vw - 36px));background:var(--txt);color:var(--ink);z-index:46;padding:18px 16px 12px}
+.dlg{max-height:calc(100vh - 24px);overflow:auto}.dlg.nova{top:max(12px,6vh)}
 .dlg h4{font-size:23px;font-weight:700}.dlg p{font-size:15px;margin:7px 0 14px;overflow-wrap:anywhere}
 .dlg div{display:flex;justify-content:flex-end;gap:8px}.dlg button{height:44px;padding:0 14px;font:700 14px var(--mono)}
 .dlg .no{border:1px solid var(--ink)}.dlg .si{background:#c8102e;color:#fff}
@@ -209,6 +216,8 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></symbol>
 <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></symbol>
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="1.5"/><path d="M15.5 8.5V4H4v11.5h4.5"/></symbol>
+<symbol id="paste" viewBox="0 0 24 24"><path d="M9 3.5h6v3H9zM7 5H5v16h14V5h-2M8.5 12h7M8.5 16h5"/></symbol>
 <symbol id="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
 </defs></svg>
 <div id="prep" hidden></div>

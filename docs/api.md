@@ -39,13 +39,14 @@ Ciclo: `pendente` → (worker) → `ok` com itens, ou `falhou` com `erro` (apare
 | Método e rota | Corpo | Resposta |
 |---|---|---|
 | 🔒 `GET /api/itens` | | `{"itens": [...], "revisar": [...], "lixeira": [...], "pastas": [...]}`. `itens` = não arquivados, mais novos primeiro; `revisar` = capturas `pendente`/`falhou`; `lixeira` = arquivados. |
-| 🔒 `POST /api/itens` | `{"titulo", "contexto"?: slug (padrão "outro"), "tipo"?: tarefa\|compromisso\|ideia\|compra\|nota, "prioridade"?: critica\|alta\|media\|baixa, "prazo"?: "sexta 14h"}` | `{"id", "descricao"}`. Criação manual, sem IA. Prazo resolvido por `rules.py`; data não entendida dá `422`. Sem `prioridade`, a regra calcula pelo prazo. |
+| 🔒 `POST /api/itens` | `{"titulo", "contexto"?: slug (padrão "outro"), "tipo"?: tarefa\|compromisso\|ideia\|compra\|nota, "prioridade"?: critica\|alta\|media\|baixa, "prazo"?: "sexta 14h" ou "AAAA-MM-DD[THH:MM]", "repete"?: diario\|semanal\|mensal, "detalhe"?: texto (≤2000)}` | `{"id", "descricao"}`. Criação manual, sem IA (também o Colar cards). Prazo escrito resolvido por `rules.py`; ISO (calendário) validado como data real; data não entendida dá `422`. Sem `prioridade`, a regra calcula pelo prazo. |
 | 🔒 `POST /api/itens/editar` | `{"ids": [1..500], "campo": "estado"\|"contexto"\|"prioridade", "valor": "..."}` | `{"grupo", "descricao", "n"}`. Feito, Excluir (`estado=arquivado`), Restaurar, Mover e criticidade, em um ou vários itens. Tudo ou nada: um id inválido dá `404`/`422` e nada muda. Um grupo = um Desfazer. |
+| 🔒 `POST /api/itens/{id}/editar` | `{"mudancas": {"titulo"\|"tipo"\|"contexto"\|"prioridade"\|"prazo"\|"repete"\|"detalhe": "..."}}` | `{"grupo", "descricao"}`. Botão Editar do card: vários campos, tudo ou nada, um Desfazer. `prazo` aceita texto ou ISO; `"limpar"` tira o prazo. `repete`/`detalhe` vazios apagam. Valor inválido dá `422`. |
 | 🔒 `POST /api/layout` | `{"itens": [{"id", "col": 1-4, "lin": 1-1000, "larg": 1-4, "alt": 1-4}]}` | `{"ok": true}`. Posição e tamanho do card na grade da pasta. |
 | 🔒 `POST /api/itens/{id}/apagar` | | Apaga de vez um item **que está na Lixeira** (`404` se não está). Remove o item e o diário dele e reescreve a captura sem o texto. |
 | 🔒 `POST /api/lixeira/esvaziar` | | `{"apagados": n}`. |
 
-Campos de `item`: `id, captura_id, tipo, titulo, contexto` (slug da pasta)`, prazo_texto, prazo_em` (`YYYY-MM-DD` ou `YYYY-MM-DDTHH:MM`)`, prioridade, tags` (JSON)`, estado` (`catalogado|feito|arquivado`)`, criado_em, grade_col, grade_lin, grade_larg, grade_alt`.
+Campos de `item`: `id, captura_id, tipo, titulo, contexto` (slug da pasta)`, prazo_texto, prazo_em` (`YYYY-MM-DD` ou `YYYY-MM-DDTHH:MM`)`, prioridade, tags` (JSON)`, estado` (`catalogado|feito|arquivado`)`, criado_em, grade_col, grade_lin, grade_larg, grade_alt, repete` (`diario|semanal|mensal`)`, detalhe` (texto abaixo do título).
 
 ## Pastas
 

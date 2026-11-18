@@ -52,16 +52,22 @@ Limite: lista em várias linhas com o destino só na última tem as primeiras li
 ### Janela flutuante da IA
 Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "adia o dentista pra segunda", "anota que..."). As ações (criar, estado, prazo, contexto, prioridade) são validadas pelo servidor (item existe, enum válido, data resolvida por regra), precisam citar o item no pedido ou no turno anterior e são **aplicadas na hora com Desfazer**. Não existe ação de apagar de vez. Texto de nota é tratado como dado não confiável (prompt injection). Limitação medida: o 7B erra contas de data, então a lista enviada ao modelo já traz dia da semana e "amanhã/em N dias"; ainda pode sobre-incluir itens em perguntas vagas ("o que tenho hoje?").
 
+### Recursos da tela (18/11/2026)
+- **Copiar/colar cards:** texto puro, sem servidor. `cardsEmTexto` gera `- [ ] Título (Pasta · tipo · criticidade · prazo AAAA-MM-DD HH:MM · repete X)` com o `detalhe` recuado; `textoEmCards` lê isso ou qualquer texto (um card por linha) e cria via `POST /api/itens`. Sem acesso à área de transferência: caixa de texto.
+- **Prazo pelo calendário:** a tela manda ISO; servidor valida com `chat.data_iso` (local.js: `dataIso`). Texto escrito continua por `rules.py`.
+- **Avisos de atraso:** Notification API pelo service worker, checados a cada `atualizar()` (5 s); já avisados em `localStorage["dumpbox.avisados"]` (id → prazo). Teto: app fechado não avisa; para isso Web Push ou Telegram (fase 3).
+- **Tutorial:** 6 passos, abre se `localStorage["dumpbox.tour"]` vazio; "ajuda" reabre.
+
 ### Modelo de dados atual (servidor, `db.py`)
 - `captura(id UUID do cliente, texto, origem[web|chat|editor|manual], criado_em, status[pendente|ok|falhou], erro)`: texto original; só muda em "Apagar de vez".
-- `item(id, captura_id, tipo, titulo, contexto = slug da pasta, prazo_texto, prazo_em, prioridade[critica|alta|media|baixa], tags, estado[catalogado|feito|arquivado], criado_em, grade_col, grade_lin, grade_larg, grade_alt)`.
+- `item(id, captura_id, tipo, titulo, contexto = slug da pasta, prazo_texto, prazo_em, prioridade[critica|alta|media|baixa], tags, estado[catalogado|feito|arquivado], criado_em, grade_col, grade_lin, grade_larg, grade_alt, repete[diario|semanal|mensal], detalhe)`.
 - `pasta(slug, nome, descricao, ordem, criado_em)`: semeada com as 7 padrão; `outro` é fixa.
 - `alteracao(grupo, captura_id, item_id, campo, antes, depois, descricao, desfeito)`: diário de toda mudança da tela, do editor e da IA; um grupo = um Desfazer. Também é a fonte dos exemplos que a IA aprende (`db.exemplos`).
 - `imagem(captura_id, dados)`: foto em base64 esperando a IA; apagada quando vira itens (captura `origem=imagem`).
 - `classificacao(captura_id, modelo, prompt_v, latencia_ms, valido, erro)`: auditoria de cada chamada.
 
 ### Testes
-- `tests/test_rules.py` (datas), `tests/test_api.py` (API, editor, IA com Ollama falso, pastas, lixeira), `tests/ui_browser.py` (tela real no Chrome headless, PC e celular com toque, banco temporário).
+- `tests/test_rules.py` (datas), `tests/test_api.py` (API, editor, IA com Ollama falso, pastas, lixeira), `tests/ui_browser.py` (tela real no Chrome headless, PC e celular com toque, banco temporário), `tests/ui_local.py` (modo celular: localStorage, tutorial, cópia do PC, conectar).
 
 ## Decisões (histórico, parte Android)
 - **Android nativo (Kotlin), Android-only.** StatCounter jun-ago/2026: ~68% mundo, ~75-79% Brasil.

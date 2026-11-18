@@ -72,9 +72,10 @@ Lidas do ambiente ou de `config.env` (o ambiente tem prioridade). Modelo em [`.e
 python tests/test_rules.py                    # datas e prioridade
 PYTHONUTF8=1 python tests/test_api.py         # API, editor, chat, pastas, lixeira; Ollama trocado por um falso
 python tests/ui_browser.py                    # tela real no Chrome headless, PC e celular, banco temporário
+python tests/ui_local.py                      # modo celular (GitHub Pages): dados no aparelho, tutorial, conectar ao PC
 ```
 
-`ui_browser.py` precisa de Playwright; se ele estiver fora do ambiente, aponte com `DUMPBOX_PW_PATH`. Todos usam banco temporário: não tocam no seu.
+`ui_browser.py` precisa de Playwright; se ele estiver fora do ambiente, aponte com `DUMPBOX_PW_PATH`. Todos usam banco temporário: não tocam no seu. Os testes de tela marcam `dumpbox.tour=1` (tutorial não abre), exceto o teste do tutorial em `ui_local.py`. Teste interrompido pode deixar o uvicorn da porta 8125 vivo: encerre pelo PID antes de rodar de novo.
 
 ## Avaliar o modelo
 

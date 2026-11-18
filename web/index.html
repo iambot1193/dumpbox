@@ -81,7 +81,13 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .c.sel{outline:2px solid var(--txt);outline-offset:-2px;background:#2e3327}
 .c.sel::after{content:"✓";position:absolute;right:26px;bottom:4px;font:700 14px var(--mono);color:var(--txt)}
 .qtd{position:absolute;right:-10px;top:-10px;min-width:26px;height:26px;padding:0 6px;background:var(--txt);color:var(--ink);font:700 14px/26px var(--mono);text-align:center}
-.bnova,.bcolar,.bsel{border:1px solid var(--line);padding:4px 10px;color:var(--txt)}.bnova b{color:var(--sig);font-size:17px;line-height:1}
+.bnova,.bcolar,.bsel,.brapida{border:1px solid var(--line);padding:4px 10px;color:var(--txt)}
+.brapida{border-color:var(--sig);color:var(--sig);margin-right:10px}.brapida:hover{background:var(--sig);color:var(--ink)}.bnova{margin-right:2px}
+.nova .ckl{display:block;margin-bottom:10px}.nova .ckl>span{display:block;font:12.5px var(--mono);color:#55574a;margin-bottom:3px}
+.nova .lst{display:block}.nova .li{display:flex;justify-content:flex-start;align-items:center;gap:6px;margin-bottom:4px}
+.nova .li input[type=checkbox]{width:20px;height:20px;flex:none;accent-color:#3f6b12}.nova .li input:checked+input{text-decoration:line-through;color:#7c7d6e}
+.nova .li .x{height:40px;padding:0 12px;border:1px solid #9a9784;font-size:18px}
+.nova .addli{height:36px;padding:0 10px;border:1px dashed var(--ink);font:13px var(--mono)}.bnova b{color:var(--sig);font-size:17px;line-height:1}
 .bnova:hover,.bcolar:hover,.bsel:hover,.bsel.on{border-color:var(--txt)}.bsel.on{background:var(--txt);color:var(--ink)}
 #barra{position:fixed;left:276px;bottom:18px;z-index:31;display:flex;align-items:center;flex-wrap:wrap;gap:4px;background:var(--txt);color:var(--ink);padding:6px 8px;font:13.5px var(--mono);max-width:calc(100vw - 380px)}
 #barra .n{font-weight:700;padding:0 8px}#barra button{min-height:36px;padding:0 10px;border:1px solid transparent}
@@ -234,6 +240,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
 <symbol id="copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="1.5"/><path d="M15.5 8.5V4H4v11.5h4.5"/></symbol>
 <symbol id="paste" viewBox="0 0 24 24"><path d="M9 3.5h6v3H9zM7 5H5v16h14V5h-2M8.5 12h7M8.5 16h5"/></symbol>
+<symbol id="bolt" viewBox="0 0 24 24"><path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/></symbol>
 <symbol id="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
 </defs></svg>
 <div id="prep" hidden></div>

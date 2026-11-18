@@ -396,7 +396,29 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
   dia.oninput = () => { prazo.value = ""; };
   hora.oninput = () => { prazo.value = ""; if (hora.value && !dia.value) dia.value = horaLocal().slice(0, 10); };
   const prazoFinal = () => prazo.value.trim() || (dia.value ? dia.value + (hora.value ? "T" + hora.value : "") : "");
-  const det = el("textarea"); det.maxLength = 2000; det.rows = 3; det.placeholder = "Detalhes, links… (opcional). Check-list: uma linha “[ ] item” por item"; det.value = it?.detalhe || "";
+  // texto livre + check-list editável (um campo por item; Enter cria o próximo, Backspace no vazio apaga). Grava tudo no `detalhe`.
+  // ponytail: ao salvar, o texto vem primeiro e os itens depois (linhas misturadas perdem a ordem original)
+  const linhasDet = (it?.detalhe || "").split("\n");
+  const det = el("textarea"); det.maxLength = 2000; det.rows = 2; det.placeholder = "Detalhes, links… (opcional)";
+  det.value = linhasDet.filter(l => !CHK.test(l)).join("\n").trim();
+  const lista = el("div", "lst"), ckl = el("div", "ckl"), addLi = el("button", "addli", "+ item de check-list");
+  const novoItem = (txt = "", marcado = false, foco = false, depois = null) => {
+    const r = el("div", "li"), cb = el("input"), t = el("input"), x = el("button", "x", "×");
+    cb.type = "checkbox"; cb.checked = marcado; cb.setAttribute("aria-label", "Feito");
+    t.value = txt; t.maxLength = 200; t.placeholder = "item (Enter = próximo)";
+    x.type = "button"; x.title = "Tirar item"; x.onclick = () => r.remove();
+    t.onkeydown = e => {
+      if (e.key === "Enter") { e.preventDefault(); novoItem("", false, true, r); }
+      else if (e.key === "Backspace" && !t.value) { e.preventDefault(); const ant = r.previousElementSibling; r.remove(); (ant?.querySelector("input:not([type=checkbox])") || addLi).focus(); }
+    };
+    r.append(cb, t, x); depois ? depois.after(r) : lista.append(r);
+    if (foco) t.focus();
+  };
+  for (const l of linhasDet) { const m = l.match(CHK); if (m) novoItem(m[2], m[1] !== " "); }
+  addLi.type = "button"; addLi.onclick = () => novoItem("", false, true);
+  ckl.append(el("span", "", "Check-list"), lista, addLi);
+  const detFinal = () => [det.value.trim(), ...[...lista.children].map(r => [r.children[0].checked, r.children[1].value.trim()]).filter(([, t]) => t).map(([c, t]) => `[${c ? "x" : " "}] ${t}`)]
+    .filter(Boolean).join("\n");
   const rep = opcoes(el("select"), [["", "não repete"], ...Object.entries(REPETE)], it?.repete || "");
   titulo.value = it ? it.titulo || "" : tituloIni || "";
   const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
@@ -406,7 +428,7 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
     e.preventDefault(); si.disabled = true;
     try {
       if (it) {
-        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazoFinal(), repete: rep.value, detalhe: det.value.trim() };
+        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazoFinal(), repete: rep.value, detalhe: detFinal() };
         const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete, detalhe: it.detalhe };
         for (const k in m) if (m[k] === (antes[k] || "")) delete m[k];
         if (m.prazo === "") m.prazo = "limpar";  // tinha prazo e o dia foi apagado
@@ -416,7 +438,7 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
         }
         fim(); ultimo = ""; return atualizar();
       }
-      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: det.value.trim() || null });
+      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: detFinal() || null });
       fim(); toast(r.descricao); sinal("criar"); ultimo = ""; atualizar();
     } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
@@ -424,7 +446,7 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
   const linha3 = el("div", "duas"); linha3.append(campo("Prazo: dia", dia), campo("hora (opcional)", hora));
   const linha4 = el("div", "duas"); linha4.append(campo("ou escreva o prazo", prazo), campo("Criticidade", crit));
   pe.append(no, si);
-  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), linha2, linha3, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), ckl, linha2, linha3, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----
@@ -461,7 +483,8 @@ function apagarPasta(slug) {
     return () => { toast(r.descricao); ir("hoje"); ultimo = ""; atualizar(); };
   });
 }
-const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Criar tarefas rápido (Enter cria e já deixa pronto para a próxima)", abrirRapida);
+const botaoNova = () => botao("bnova", [el("b", "", "+"), "Nova"], "Nova tarefa com todos os campos (pasta, prazo, texto, check-list, repetir)", () => novaTarefa());
+const botaoRapida = () => botao("brapida", [ic("bolt"), "Rápida"], "Criar várias seguidas: escreva e Enter (“@ sexta 14h” põe prazo)", abrirRapida);
 // ---- criação rápida: o + abre uma linha no topo; Enter cria e limpa, pronta para a próxima ----
 let rapida = null;
 function abrirRapida() {
@@ -755,7 +778,7 @@ function vHoje(v) {
   const abertosHoje = hoje.filter(aberto), feitos = hoje.length - abertosHoje.length;
   const n = atras.length + abertosHoje.length, ps = new Set([...atras, ...abertosHoje].map(pasta)).size;
   const d = new Date();
-  v.append(cabecalho("Hoje", `${n} aberto${n === 1 ? "" : "s"} em ${ps} pasta${ps === 1 ? "" : "s"} · ${SEMANA[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`, botaoNova(), botaoColar(), botaoSel(), chaveFeitos(feitos)));
+  v.append(cabecalho("Hoje", `${n} aberto${n === 1 ? "" : "s"} em ${ps} pasta${ps === 1 ? "" : "s"} · ${SEMANA[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`, botaoNova(), botaoRapida(), botaoColar(), botaoSel(), chaveFeitos(feitos)));
   const secao = (t, l) => {
     if (!l.length) return;
     v.append(el("div", "sec", `${t} · ${l.length}`));
@@ -779,7 +802,7 @@ function vPasta(v) {
   const ft = el("div", "ft");
   ft.append(botao(filtro ? "" : "on", ["Todas"], null, () => { filtro = null; render(); }));
   for (const [val, n] of NIVEIS) ft.append(botao(filtro === val ? "on" : "", [n], null, () => { filtro = val; render(); }));
-  v.append(cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoColar(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length),
+  v.append(cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoRapida(), botaoColar(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length),
     ...(vista === "outro" ? [] : [botao("perigo", ["Apagar pasta"], "Apagar esta pasta (os itens vão para outra)", () => apagarPasta(vista))])));
   if (!lista.length) { v.append(el("p", "vazio", filtro ? "Nada com essa criticidade." : "Pasta vazia.")); gradeAtual = null; return; }
   gradeAtual = lista;
@@ -931,7 +954,7 @@ async function avisarVencidos() {
 const TOUR = "dumpbox.tour";
 const PASSOS = [  // [alvo, título, texto, ação que avança (sem ação: botão Próximo)]
   ["#txt", "Despeje uma nota", "Escreva qualquer coisa na caixa e toque Guardar. Com o PC, a IA separa em tarefas, prazos e pastas. O microfone dita por voz.", "guardar"],
-  [".bnova", "Criar rápido", "Toque + e escreva uma tarefa. Enter cria e já deixa a linha pronta para a próxima. “@ sexta 14h” põe prazo.", "criar"],
+  [".brapida", "Criar rápido", "Toque Rápida e escreva uma tarefa. Enter cria e já deixa a linha pronta para a próxima. “@ sexta 14h” põe prazo.", "criar"],
   ["#vista .c .ok", "Concluir", "Toque ✓ num card, ou deslize o card para a direita.", "feito"],
   [".bsel", "Vários de uma vez", "No celular: segure o dedo num card e toque nos outros. No PC: Ctrl+clique. A barra de baixo conclui, copia, move ou exclui. Copiar gera texto pronto para o WhatsApp; Colar cria cards de qualquer texto."],
   ["#nav", "Pastas e Hoje", "A lateral tem as pastas. Hoje junta o que vence hoje e o que está atrasado. No texto do card, linhas “[ ] item” viram check-list. No celular, puxe o canto do card para mudar o tamanho."],

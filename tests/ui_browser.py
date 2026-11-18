@@ -343,8 +343,8 @@ try:
         ok(item(a1)["estado"] == "arquivado", "Delete exclui a seleção")
         g.click("#toast button"); time.sleep(.6)
         # ---- nova tarefa à mão ----
-        # + abre a linha rápida: Enter cria e a linha fica pronta (com foco) para a próxima; "@" põe prazo
-        g.click(".bnova")
+        # Rápida abre a linha: Enter cria e a linha fica pronta (com foco) para a próxima; "@" põe prazo
+        g.click(".brapida")
         g.fill(".rapida input", "Rápida um @ amanhã 9h"); g.press(".rapida input", "Enter")
         g.wait_for_selector("#toast >> text=criado em")
         g.fill(".rapida input", "Rápida dois"); g.press(".rapida input", "Enter")
@@ -362,6 +362,10 @@ try:
            "marcar item grava no texto, sem concluir nem selecionar o card")
         g.click(".rapida .mais")
         g.fill(".nova input >> nth=0", "Preparar slides da aula")
+        # check-list no formulário: um campo por item, Enter cria o próximo, Backspace no vazio apaga
+        g.click(".nova .addli"); g.keyboard.type("slide 1"); g.keyboard.press("Enter"); g.keyboard.type("slide 2")
+        g.keyboard.press("Enter"); g.keyboard.press("Backspace")
+        ok(g.locator(".nova .li").count() == 2, "Enter cria item, Backspace no vazio apaga")
         g.fill(".nova input[placeholder^='ex.: sexta']", "quando der")
         g.click(".nova .si")
         g.wait_for_selector(".nova .erro >> text=não entendi a data")
@@ -374,6 +378,13 @@ try:
         ok(novo_ is not None and novo_["contexto"] == "trabalho" and novo_["prazo_em"].endswith("T10:00") and novo_["prioridade"] == "alta",
            "nova tarefa criada na pasta atual, com prazo e prioridade por regra")
         ok(card("Preparar slides da aula").count() == 1, "nova tarefa aparece na tela")
+        ok(novo_["detalhe"] == "[ ] slide 1\n[ ] slide 2", f"check-list do formulário grava no texto {novo_['detalhe']!r}")
+        card("Preparar slides da aula").hover(); card("Preparar slides da aula").locator(".ed").click()
+        ok(g.locator(".nova .li").count() == 2 and g.locator(".nova textarea").input_value() == "", "Editar abre com os itens da check-list")
+        g.keyboard.press("Escape")
+        g.click(".bnova")
+        ok(g.locator(".nova h4").inner_text() == "Nova tarefa", "+ Nova abre o formulário completo (Rápida é outro botão)")
+        g.keyboard.press("Escape")
         # ---- pastas: criar, usar, apagar ----
         g.keyboard.press("Escape")
         g.click(".fold.mais")

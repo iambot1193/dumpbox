@@ -74,7 +74,7 @@ with sync_playwright() as p:
     ok(g.locator(".tour").count() == 1, "“ajuda” reabre o tutorial")
     # interativo: fazer na tela avança o passo (e a tela continua usável com o tutorial aberto)
     g.locator(".tour button", has_text="Pular passo").click()
-    g.click(".bnova"); g.fill(".rapida input", "Tarefa do tutorial"); g.press(".rapida input", "Enter")
+    g.click(".brapida"); g.fill(".rapida input", "Tarefa do tutorial"); g.press(".rapida input", "Enter")
     g.wait_for_selector(".tour .passo >> text=3 de 6")
     ok(True, "criar pelo + avança o tutorial")
     g.locator("#vista article", has=g.locator('h3:text-is("Tarefa do tutorial")')).locator(".ok").click()

@@ -116,6 +116,6 @@ Sem o PC ligado, o celular ainda guarda notas e envia depois, mas não mostra os
 - **Concluir pelo ✓:** o card risca, brilha em verde e some antes de gravar.
 
 ## Novidades (18/11/2026, tarde)
-- **Criação rápida:** o **+ Nova** abre uma linha no topo da pasta. Escreva e Enter: cria e a linha fica pronta para a próxima. `Pagar luz @ sexta 14h` põe prazo. "mais opções" abre o formulário completo com o título já escrito. Esc ou ✕ fecha.
-- **Check-list no card:** no texto do card, cada linha `[ ] item` vira caixinha marcável, com contador (☑ 2/5). Marcar grava na hora, sem concluir o card.
+- **Dois botões de criar:** **+ Nova** abre o formulário completo (pasta, prazo, texto, check-list, repetir). **⚡ Rápida** (laranja) abre uma linha no topo: escreva e Enter cria e já deixa pronta para a próxima; `Pagar luz @ sexta 14h` põe prazo; "mais opções" leva o título para o formulário completo. Esc ou ✕ fecha.
+- **Check-list:** no Nova/Editar, "+ item de check-list" cria um campo por item: Enter cria o próximo, Backspace no campo vazio apaga, × tira. No card vira caixinhas marcáveis com contador (☑ 2/5); marcar grava na hora, sem concluir o card. (Fica salvo no texto como linhas `[ ] item`; digitar assim também funciona.)
 - **Celular em 2 colunas:** cards de criticidade alta/crítica ocupam a linha toda; os outros, meia. Puxe o canto (riscos no canto de baixo) para a direita = inteiro, para a esquerda = meio, para baixo/cima = altura (1 a 4). O tamanho vale também no PC (inteiro no celular = largura 2+ lá).

@@ -54,6 +54,7 @@ Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "ad
 
 ### Recursos da tela (18/11/2026)
 - **Copiar/colar cards:** texto puro, sem servidor. `cardsEmTexto` gera formato WhatsApp (`*Pasta*`, `☐ Título`/`✅ ~Título~`, etiqueta `_tipo · criticidade · 📅 dd/mm/aaaa hh:mm · 🔁 todo dia_` e `detalhe` recuados); `textoEmCards` lê isso, o formato antigo `- [ ] Título (…)` ou qualquer texto (um card por linha) e cria via `POST /api/itens`. Sem acesso à área de transferência: caixa de texto.
+- **Backup do modo celular (local.js):** `navigator.storage.persist()` no início; "Salvar backup" baixa `{dumpbox:1, backup:true, ...S}`; `importar()` com `backup:true` substitui tudo (estado anterior em `dumpbox.local.antes`), sem ele é cópia do PC. Data do último em `dumpbox.local.backup_em`; `semBackup()` põe ⚠ no aviso do `/api/estado` (nunca feito ou ≥ 7 dias). Teto: arquivo manual; garantia real = sync com o PC (`docs/plano-sync.md`).
 - **Prazo pelo calendário:** a tela manda ISO; servidor valida com `chat.data_iso` (local.js: `dataIso`). Texto escrito continua por `rules.py`.
 - **Avisos de atraso:** Notification API pelo service worker, checados a cada `atualizar()` (5 s); já avisados em `localStorage["dumpbox.avisados"]` (id → prazo). Teto: app fechado não avisa; para isso Web Push ou Telegram (fase 3).
 - **Tutorial guiado:** `PASSOS` = [alvo, título, texto, ação]. Um `.furo` fixo (box-shadow escurece o resto, `pointer-events:none`) segue o alvo por requestAnimationFrame; a tela fica usável. A ação avança via `sinal(nome)` chamado por Guardar, criar (rápida/form) e `editar(estado=feito)`. Abre se `localStorage["dumpbox.tour"]` vazio; "ajuda" reabre.
@@ -70,7 +71,7 @@ Pergunta sobre as notas e pede mudanças ("marca a conta de luz como feita", "ad
 - `classificacao(captura_id, modelo, prompt_v, latencia_ms, valido, erro)`: auditoria de cada chamada.
 
 ### Testes
-- `tests/test_rules.py` (datas), `tests/test_api.py` (API, editor, IA com Ollama falso, pastas, lixeira), `tests/ui_browser.py` (tela real no Chrome headless, PC e celular com toque, banco temporário), `tests/ui_local.py` (modo celular: localStorage, tutorial, cópia do PC, conectar).
+- `tests/test_rules.py` (datas), `tests/test_api.py` (API, editor, IA com Ollama falso, pastas, lixeira), `tests/ui_browser.py` (tela real no Chrome headless, PC e celular com toque, banco temporário), `tests/ui_local.py` (modo celular: localStorage, tutorial, backup/restaurar, cópia do PC, conectar).
 
 ## Decisões (histórico, parte Android)
 - **Android nativo (Kotlin), Android-only.** StatCounter jun-ago/2026: ~68% mundo, ~75-79% Brasil.

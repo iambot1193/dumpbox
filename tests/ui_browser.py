@@ -577,6 +577,36 @@ try:
         m.wait_for_selector("#toast >> text=marcado como feito", timeout=4000)
         ok(item(tz)["estado"] == "feito", "deslizar para a direita marca como feito")
         ok(m.locator("#barra").is_hidden(), "deslizar não liga a seleção")
+        # card meio é quase todo botão: deslizar começando em cima do botão de apagar também conclui (e não apaga)
+        m.wait_for_function("!document.querySelector('#vista article.c[style*=\"translateX\"]')")
+        cm = m.locator("#vista article.c:not(.w2)").first
+        cm.evaluate("e => e.scrollIntoView({ block: 'center' })"); time.sleep(.2)
+        tb = cm.locator("h3").inner_text()
+        bb = cm.locator(".acts .tr").bounding_box()
+        xb, yb = bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2
+        toque("touchStart", [{"x": xb, "y": yb}])
+        for i in range(1, 7):
+            toque("touchMove", [{"x": xb + 20 * i, "y": yb + 2}]); time.sleep(.02)
+        toque("touchEnd", [])
+        m.wait_for_selector(f"#toast >> text=“{tb}” marcado como feito", timeout=4000)
+        ok(item(tb)["estado"] == "feito", "deslizar começando no botão do card meio conclui sem apagar")
+
+        # puxar o aviso para o lado fecha; menu "avisos" desliga o aviso ao concluir
+        ta = m.locator("#toast span").bounding_box()
+        xa, ya = ta["x"] + 10, ta["y"] + ta["height"] / 2
+        toque("touchStart", [{"x": xa, "y": ya}])
+        for i in range(1, 6):
+            toque("touchMove", [{"x": xa + 25 * i, "y": ya}]); time.sleep(.02)
+        toque("touchEnd", [])
+        ok(m.locator("#toast").is_hidden(), "puxar o aviso para o lado fecha")
+        m.locator("#nav button:text-is('ajuda')").scroll_into_view_if_needed(); time.sleep(1)  # toque com a lateral ainda rolando perde o clique
+        m.locator("#nav button:text-is('avisos')").tap(); time.sleep(.3)
+        m.locator(".menu button", has_text="Ao concluir").tap()
+        ok("Ao concluir: não" in m.inner_text(".menu"), "menu de avisos troca a opção e continua aberto")
+        m.keyboard.press("Escape")
+        m.evaluate("toast('teste', 'g-teste', 'concluir')")  # mesma chamada que concluir faz (sem gastar card)
+        ok(m.locator("#toast").is_hidden(), "com “ao concluir” desligado, concluir não mostra aviso")
+        m.evaluate("localStorage.removeItem('dumpbox.avisos')")
 
         # rolar não deve virar arraste
         a = m.locator("#vista article .meta").first.bounding_box()

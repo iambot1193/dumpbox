@@ -152,6 +152,7 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 #toast{position:fixed;left:276px;bottom:18px;max-width:min(560px,calc(100vw - 380px));display:flex;align-items:center;gap:14px;background:var(--raise);border:1px solid var(--txt);padding:10px 14px;font:14px var(--mono);z-index:30}
 #toast .i{color:var(--ok)}#toast span{overflow-wrap:anywhere}
 #toast{pointer-events:none;opacity:.88}  /* aviso não bloqueia: clique passa por ele, só o Desfazer é botão */
+#toast.puxa{pointer-events:auto;touch-action:pan-y;cursor:grab;user-select:none}  /* puxável: toque parado é repassado ao que está embaixo (app.js) */
 #toast button{font-weight:700;text-decoration:underline;white-space:nowrap;pointer-events:auto}
 .c .det.lista{display:block;-webkit-line-clamp:unset;white-space:normal}
 .chk{display:flex;align-items:flex-start;gap:7px;padding:3px 0;cursor:pointer}.chk input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--ok);flex:none}

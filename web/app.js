@@ -140,18 +140,57 @@ function fixarGrade(fixo) {
 async function editar(ids, campo, valor) {
   try {
     const r = await api("/api/itens/editar", { ids: [].concat(ids), campo, valor });
-    if (r.grupo) { (vistos ||= new Set()).add(r.grupo); toast(r.descricao, r.grupo); }
+    if (r.grupo) { (vistos ||= new Set()).add(r.grupo); toast(r.descricao, r.grupo, campo === "estado" && valor === "feito" ? "concluir" : null); }
     if (campo === "estado" && valor === "feito") sinal("feito");
     ultimo = ""; await atualizar();
   } catch (e) { if (String(e.message) !== "401") toast("Não consegui salvar. O PC está ligado?"); }
 }
+// ---- avisos (toast): preferências deste aparelho ----
+// ponytail: localStorage por aparelho; ir para o servidor se quiser a mesma config em todos
+const CFG_PADRAO = { mudo: false, concluir: true, mudancas: true, tempo: 9, puxar: true };
+let CFG = { ...CFG_PADRAO };
+try { Object.assign(CFG, JSON.parse(localStorage.getItem("dumpbox.avisos") || "{}")); } catch {}
+const gravaCfg = () => { try { localStorage.setItem("dumpbox.avisos", JSON.stringify(CFG)); } catch {} };
 let timerToast;
-function toast(txt, grupo) {
+// tipo: "concluir" (marcou feito) ou "mudanca" (feita pela IA / outro aparelho). Silenciar só cala aviso de mudança
+// (os que têm Desfazer); erro e resposta direta (copiado, colado...) sempre aparecem.
+function toast(txt, grupo, tipo) {
+  if (grupo && (CFG.mudo || (tipo === "concluir" && !CFG.concluir) || (tipo === "mudanca" && !CFG.mudancas))) return;
   const t = $("toast");
   t.replaceChildren(ic("check"), el("span", "", txt));
   if (grupo) t.append(botao("", [ic("undo"), "Desfazer"], null, async () => { t.hidden = true; await api("/api/desfazer", { grupo }); ultimo = ""; atualizar(); }));
+  t.classList.toggle("puxa", CFG.puxar); t.style.transform = t.style.opacity = "";
   t.hidden = false;
-  clearTimeout(timerToast); timerToast = setTimeout(() => { t.hidden = true; }, 9000);
+  clearTimeout(timerToast); timerToast = setTimeout(() => { t.hidden = true; }, CFG.tempo * 1000);
+}
+// puxar o aviso para o lado fecha; toque parado passa para o que está embaixo (o aviso não bloqueia a tela)
+$("toast").addEventListener("pointerdown", ini => {
+  const t = $("toast");
+  if (!CFG.puxar || ini.target.closest("button")) return;
+  let dx = 0;
+  const mover = e => { dx = e.clientX - ini.clientX; t.style.transform = `translateX(${dx}px)`; t.style.opacity = Math.max(.2, 1 - Math.abs(dx) / 200); };
+  const soltar = e => {
+    document.removeEventListener("pointermove", mover); document.removeEventListener("pointerup", soltar); document.removeEventListener("pointercancel", soltar);
+    if (Math.abs(dx) > 60) { clearTimeout(timerToast); t.hidden = true; return; }
+    t.style.transform = t.style.opacity = "";
+    if (e.type === "pointerup" && Math.abs(dx) < 8) {  // toque: repassa o clique
+      t.style.visibility = "hidden"; const sob = document.elementFromPoint(e.clientX, e.clientY); t.style.visibility = "";
+      sob?.click();
+    }
+  };
+  document.addEventListener("pointermove", mover); document.addEventListener("pointerup", soltar); document.addEventListener("pointercancel", soltar);
+});
+function menuAvisos(a) {
+  const sim = v => v ? "sim" : "não", troca = k => () => { CFG[k] = !CFG[k]; gravaCfg(); menuAvisos(a); };
+  const tempos = [4, 9, 20];
+  popover(a, "Avisos", [
+    { txt: `Silenciar avisos: ${sim(CFG.mudo)}`, fn: troca("mudo") },
+    { txt: `Ao concluir: ${sim(CFG.concluir)}`, fn: troca("concluir") },
+    { txt: `Mudanças da IA: ${sim(CFG.mudancas)}`, fn: troca("mudancas") },
+    { txt: `Na tela: ${CFG.tempo} s`, fn: () => { CFG.tempo = tempos[(tempos.indexOf(CFG.tempo) + 1) % tempos.length]; gravaCfg(); menuAvisos(a); } },
+    { txt: `Puxar p/ fechar: ${sim(CFG.puxar)}`, fn: troca("puxar") },
+    { txt: "Testar aviso", fn: () => toast("Assim aparece um aviso. Puxe para o lado para fechar.") },
+  ]);
 }
 function fecharMenu() { if (menuAberto) { menuAberto.remove(); menuAberto = null; } }
 function popover(ancora, titulo, opcoes) {
@@ -540,9 +579,11 @@ document.addEventListener("touchmove", e => { if (gesto) e.preventDefault(); }, 
 function arrastavel(card, it) {
   card.addEventListener("contextmenu", e => { if (matchMedia("(hover:none)").matches) e.preventDefault(); });
   card.addEventListener("pointerdown", ini => {
-    if (ini.button || ini.target.closest("button,.rs")) return;
+    const toque = ini.pointerType === "touch", noBotao = !!ini.target.closest("button");
+    // card meio do celular é quase todo botão: no toque, deslizar pode começar em cima de um (segurar não)
+    if (ini.button || ini.target.closest(".rs") || (noBotao && !toque)) return;
     if (ini.shiftKey && ini.pointerType === "mouse") return pincel(ini, it.id);  // Shift segurado: seleciona, não move
-    const toque = ini.pointerType === "touch", r = card.getBoundingClientRect();
+    const r = card.getBoundingClientRect();
     const grabX = ini.clientX - r.left, grabY = ini.clientY - r.top;
     let clone = null, alvo = null, ph = null, cel = null, timer = null, segurou = false, antes = null, desliza = false, dx = 0;
     const grid = matchMedia(AREA_GRADE).matches && gradeAtual ? card.closest(".grid") : null, t = tam(it);
@@ -642,7 +683,7 @@ function arrastavel(card, it) {
       else if (c) fixarGrade(c);
     };
     document.addEventListener("pointermove", mover); document.addEventListener("pointerup", soltar); document.addEventListener("pointercancel", cancelar);
-    if (toque) timer = setTimeout(segurar, 350);
+    if (toque && !noBotao) timer = setTimeout(segurar, 350);
   });
 }
 function redimensionavel(alca, card, it, p) {
@@ -878,6 +919,7 @@ function desenhaNav() {
   fim.append(linha("revisar", [ic("alert"), "Revisar"], D.revisar.filter(c => c.status === "falhou").length),
     linha("lixeira", [ic("trash"), "Lixeira"], D.lixeira.length, true),
     ...(temAvisos && Notification.permission === "default" ? [botao("sair", ["ligar avisos"], "Notificar quando uma tarefa passar do prazo", ativarAvisos)] : []),
+    botao("sair", ["avisos"], "Configurar os avisos da tela", e => menuAvisos(e.currentTarget)),
     botao("sair", ["ajuda"], "Ver o tutorial de novo", () => tutorial()),
     ...(window.DUMPBOX_LOCAL ? [] : [botao("sair", ["cópia p/ celular"], "Baixar cópia para importar no app do celular", () => { location.href = "api/copia"; })]),
     botao("sair", ["sair"], null, async () => { await api("/api/logout", {}); mostra("login"); }));
@@ -905,7 +947,7 @@ function avisos(alts) {
   if (!vistos) { vistos = new Set(alts.map(a => a.grupo)); return; }
   for (const a of alts) if (!vistos.has(a.grupo)) {  // instrução digitada na caixa, aplicada pelo worker
     vistos.add(a.grupo);
-    if (!a.desfeito) toast(a.descricoes.slice(0, 2).join(" · ") + (a.descricoes.length > 2 ? ` · e mais ${a.descricoes.length - 2}` : ""), a.grupo);
+    if (!a.desfeito) toast(a.descricoes.slice(0, 2).join(" · ") + (a.descricoes.length > 2 ? ` · e mais ${a.descricoes.length - 2}` : ""), a.grupo, "mudanca");
   }
 }
 async function atualizar() {

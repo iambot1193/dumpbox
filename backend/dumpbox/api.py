@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, tailnet, visao
+from .canais import telegram
 from .schema import Tipo
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
         ollama_mgr.iniciar_em_thread()
     if os.getenv("DUMPBOX_WORKER", "1") == "1":
         threading.Thread(target=_worker, args=(parar,), daemon=True).start()
+        telegram.iniciar(parar)  # sem DUMPBOX_TG_TOKEN no config.env: não faz nada
     yield
     parar.set()
 

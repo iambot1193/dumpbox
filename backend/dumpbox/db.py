@@ -73,6 +73,13 @@ def conectar() -> sqlite3.Connection:
         if "lembrete" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # minutos antes do prazo (null = sem)
             c.execute("ALTER TABLE item ADD COLUMN lembrete INTEGER")
             c.commit()
+        if "avisado_em" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # lembrete do bot já enviado
+            c.execute("ALTER TABLE item ADD COLUMN avisado_em TEXT")
+            c.commit()
+        # mudou prazo ou lembrete (tela, sync, IA, desfazer): o aviso vale de novo. Trigger cobre todos os caminhos.
+        c.execute("CREATE TRIGGER IF NOT EXISTS reaviso AFTER UPDATE OF prazo_em, lembrete ON item "
+                  "BEGIN UPDATE item SET avisado_em=NULL WHERE id=NEW.id; END")
+        c.commit()
         if not c.execute("SELECT 1 FROM pasta LIMIT 1").fetchone():
             c.executemany("INSERT INTO pasta(slug,nome,descricao,ordem,criado_em) VALUES(?,?,?,?,?)",
                           [(s, n, d, i, agora()) for i, (s, n, d) in enumerate(PADRAO)])

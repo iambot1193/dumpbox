@@ -242,6 +242,12 @@ with sync_playwright() as p:
     g.wait_for_selector("#nav .fold")
     ok(g.locator("#app").is_visible(), "continua logado no PC depois de recarregar (token)")
     ok(g.locator(".pcok").is_visible(), "selo de PC conectado na lateral")
+    do_pc = g.evaluate("JSON.parse(localStorage['dumpbox.copia']).itens.length")
+    g.evaluate("window.DUMPBOX_DESCONECTAR()")
+    g.wait_for_selector("#nav .fold")
+    loc = g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens")
+    ok(do_pc and any(i["titulo"] == "Pagar boleto" for i in loc) and not g.evaluate("localStorage['dumpbox.pc']"),
+       "desconectar leva a cópia do PC para o aparelho (cards não somem)")
     ok(not erros, f"sem erros no console/rede {erros[:3]}")
     b.close()
 srv.shutdown()

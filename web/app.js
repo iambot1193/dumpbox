@@ -1015,7 +1015,7 @@ function desenhaNav() {
       { txt: "Avisos", fn: () => menuAvisos(a) },
       { txt: "Ajuda", fn: () => tutorial() },
       ...(window.DUMPBOX_LOCAL ? [] : [{ txt: "Conectar celular", fn: conectarCelular }, { txt: "Cópia p/ celular", fn: () => { location.href = "api/copia"; } }]),
-      ...(window.DUMPBOX_PC ? [{ txt: "Desconectar do PC", fn: () => { localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload(); } }] : []),
+      ...(window.DUMPBOX_PC ? [{ txt: "Desconectar do PC", fn: () => window.DUMPBOX_DESCONECTAR() }] : []),
       { txt: "Sair", fn: async () => { try { localStorage.removeItem(COPIA); } catch {} await api("/api/logout", {}); mostra("login"); } },
     ]); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,

@@ -247,10 +247,19 @@
       if (caminho === "logout") localStorage.removeItem("dumpbox.token");
       return r;
     };
+    // desconectar: a última cópia do PC vira a base do aparelho (sem isto os cards do PC sumiam da tela)
+    window.DUMPBOX_DESCONECTAR = () => {
+      try {
+        const cp = JSON.parse(localStorage.getItem("dumpbox.copia"));
+        if (cp?.itens?.length) importar({ dumpbox: 1, itens: cp.itens, pastas: cp.pastas || S.pastas });
+        localStorage.removeItem("dumpbox.alteracoes");  // já aplicadas na cópia; ids do PC não valem fora dele
+      } catch {}
+      localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload();
+    };
     addEventListener("DOMContentLoaded", () => {
       const b = document.createElement("button");
       b.textContent = "Usar sem o PC (desconectar)"; b.className = "no";
-      b.onclick = () => { localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload(); };
+      b.onclick = window.DUMPBOX_DESCONECTAR;
       document.getElementById("login").append(b);
     });
     return;

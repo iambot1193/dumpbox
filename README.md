@@ -4,7 +4,7 @@ Despeje texto solto (ou o print de uma lista), a IA cataloga. Notas viram itens 
 
 ![Tela do dumpbox: Hoje, foto de lista anexada, pastas com grade livre, arraste, seleção e assistente](docs/img/demo.gif)
 
-> Status: classificador com avaliação (150 casos), **API + PWA com login**, editor inteligente, pastas com grade livre e **foto de lista virando itens** prontos. Próximos: app no celular sem depender do PC (modo demo clicável), bot de lembretes no Telegram. Dados das imagens: sintéticos.
+> Status: classificador com avaliação (150 casos), **API + PWA com login**, editor inteligente, pastas com grade livre, **foto de lista virando itens**, celular offline com sync, **bots do Telegram e do WhatsApp** e **busca nas notas (RAG local)** prontos. **[Demo clicável](https://iambot1193.github.io/dumpbox/?demo=1)** (dados de exemplo, sem IA, nada sai do navegador). Dados das imagens: sintéticos.
 
 **Destaques técnicos**
 - **LLM local com saída validada:** JSON Schema gerado do Pydantic a cada chamada (enum com as pastas que existem agora), retry e nota que nunca se perde.
@@ -12,6 +12,8 @@ Despeje texto solto (ou o print de uma lista), a IA cataloga. Notas viram itens 
 - **Ações da IA reversíveis:** conjunto fechado, validadas no servidor, item precisa ser citado, tudo num diário com Desfazer; texto de nota tratado como não confiável (prompt injection).
 - **Visão:** print de checklist → `qwen2.5vl:3b` lê linhas e marcas → o que já existe é fechado, o resto vira item. Avaliado em checklists gerados por script.
 - **Avaliação reproduzível:** harness de texto e de visão com dataset público sintético; decisões de prompt medidas (tabelas abaixo).
+- **RAG local medido:** busca híbrida (embedding `paraphrase-multilingual` no SQLite + palavras exatas), recall@5 100% e recusa "não achei" 3/3 sem id inventado.
+- **Um núcleo, vários canais:** Telegram (long polling, sem expor o PC) e WhatsApp (Evolution ou Cloud API com HMAC) chamam o mesmo `canais/base.tratar`; lembretes chegam com o app fechado.
 - **Exe para PC sem nada instalado:** baixa Ollama portátil e o modelo certo pela RAM; CI gera o exe em tags.
 
 ## Como funciona
@@ -31,6 +33,12 @@ flowchart LR
   CL --> R[rules.py<br/>datas e prioridade]
   R --> DB
   ED --> DB
+  TG[Telegram<br/>long polling] --> B[canais/base]
+  ZAP[WhatsApp<br/>webhook] --> B
+  B -- "nota" --> DB
+  B -- "? pergunta" --> CH[chat<br/>busca híbrida + ações validadas]
+  CH --> DB
+  W -- "1x/min" --> LB[lembretes] --> TG & ZAP
 ```
 
 | Hoje e pastas | Assistente com Desfazer | Celular |
@@ -58,6 +66,7 @@ flowchart LR
 - **Foto ou print de lista** (botão de câmera ou Ctrl+V): fica anexada como miniatura para você escrever instruções; linhas marcadas fecham itens que já existem, o resto vira item.
 - **Lembretes:** por tarefa (na hora, 15/30 min, 1 h ou 1 dia antes do prazo), lembrete diário num horário com a lista do dia e bipe; avisa com o app aberto ou em 2º plano.
 - **Conectar celular por QR:** ⋯ mais → Conectar celular liga o `tailscale serve` e mostra o QR; no celular só falta a senha.
+- **Pelo Telegram/WhatsApp:** texto vira nota, `? pedido` fala com a IA, `/hoje` e `/desfazer`; lembretes chegam com o app fechado. Ligar: `PYTHONPATH=backend python -m dumpbox.canais.telegram` ([detalhes](docs/extras/)).
 - **+ Nova** cria tarefa à mão, sem IA. **Janela flutuante da IA** para perguntar e pedir mudanças (aplica na hora, com Desfazer; nunca apaga de vez).
 
 Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a escolhida foi a B2).
@@ -115,6 +124,7 @@ O projeto não depende de nenhum serviço de rede. Escolha o que preferir:
 ```bash
 python tests/test_rules.py                 # regras de data e prioridade
 python tests/test_api.py                   # API, editor, pastas, lixeira (Ollama trocado por um falso)
+python tests/test_canais.py                # bots Telegram/WhatsApp, lembretes e busca (sem rede)
 pip install playwright && python tests/ui_browser.py   # tela real no Chrome, PC e celular (banco temporário)
 ```
 
@@ -150,11 +160,23 @@ Casos sintéticos (46 até a v2; 150 desde as regras de prazo, com 3 datas-base,
 
 Com JSON Schema o 3B devolvia lista vazia; o protocolo é texto (`item => marcada/vazia`). Texto riscado é o ponto fraco. Se o modelo marcar a lista inteira, nada é fechado sozinho.
 
+### Perguntar às notas (busca do chat)
+
+`PYTHONUTF8=1 python eval/run_eval_rag.py --chat`: banco inventado de 40 itens, 22 perguntas com resposta e 3 sem resposta.
+
+| embedding | recall@5 | busca p50 | recusa correta | ids inventados | chat p50 |
+|---|---|---|---|---|---|
+| nomic-embed-text | 73% | 33 ms | - | - | - |
+| **paraphrase-multilingual** | **100%** | 33 ms | 3/3 | 0 | ~2 s |
+
+O nomic é treinado quase só em inglês; o multilíngue acerta sinônimos em português ("veículo" → carro, "coração" → cardiologista).
+
 ## Estrutura
 
 ```
 backend/dumpbox/   api.py (FastAPI), db.py (SQLite, pastas, lixeira), classifier.py (Ollama), editor.py (instruções),
-                   chat.py (ações + diário/Desfazer), rules.py (datas/prioridade), schema.py (contrato), ollama_mgr.py
+                   chat.py (ações + diário/Desfazer), busca.py (RAG), lembretes.py, rules.py (datas/prioridade),
+                   schema.py (contrato), ollama_mgr.py, canais/ (base, telegram, whatsapp)
 web/               PWA: index.html, app.js, sw.js, fonts/ (Barlow, OFL)
 tests/             test_rules.py, test_api.py, ui_browser.py
 eval/              harness de avaliação (texto e visão) e gerador de checklists sintéticos
@@ -172,6 +194,7 @@ docs/              arquitetura, decisões e mockups
 - [`docs/planejamento.md`](docs/planejamento.md): ideia, decisões, revisão crítica
 - [`docs/visao-imagem.md`](docs/visao-imagem.md): entrada por imagem (checklist)
 - [`docs/ambiente.md`](docs/ambiente.md): o que já está baixado e o que falta instalar
+- [`docs/extras/`](docs/extras/): bots do Telegram e do WhatsApp, busca nas notas (planos e como ligar)
 
 ## Privacidade
 

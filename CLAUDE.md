@@ -3,7 +3,7 @@
 Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) com PWA em `web/`, acesso via Tailscale; Telegram p/ lembretes (fase 3). App Kotlin foi descartado (opcional no futuro). Detalhes: `docs/arquitetura.md`. Não reler `docs/planejamento.md` salvo necessidade.
 
 ## Comandos
-- Testes: `python tests/test_rules.py` e `PYTHONUTF8=1 python tests/test_api.py` (API sem Ollama). Tela: `python tests/ui_browser.py` e `python tests/ui_local.py` (modo celular) (Playwright + Chrome; aqui o pacote está em `DUMPBOX_PW_PATH=D:\dev\_mockup_profile\pw`)
+- Testes: `python tests/test_rules.py`, `PYTHONUTF8=1 python tests/test_api.py` (API sem Ollama) e `PYTHONUTF8=1 python tests/test_canais.py` (bots, lembretes, busca; sem rede). Tela: `python tests/ui_browser.py` e `python tests/ui_local.py` (modo celular) (Playwright + Chrome; aqui o pacote está em `DUMPBOX_PW_PATH=D:\dev\_mockup_profile\pw`)
 - Pastas = tabela `pasta` (slug = `item.contexto`), cache `db.PASTAS`; nunca fixar a lista no código. Enum do JSON Schema montado por chamada.
 - Backup do banco real: API de backup do SQLite (cópia simples do .db perde o que está no -wal).
 - Banco REAL do usuário: `D:\dumpbox` (via `.\iniciar.ps1`, `DUMPBOX_HOME`), backup diário em `D:\dumpbox\backups`. Dev/testes: `data/private/` (`python run.py`). Nunca testar nem limpar dados no banco real sem pedir.
@@ -13,6 +13,8 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 - Modo celular: `web/local.js` responde /api/* no localStorage quando em *.github.io ou `?local=1`; publicado por `.github/workflows/pages.yml`. Conectado (`dumpbox.pc` no localStorage): rotas vão ao PC com Bearer (token devolvido no /api/login), CORS só p/ `DUMPBOX_ORIGENS`. Cópia PC→celular: `python -m dumpbox.exportar` (só leitura) → Importar cópia; itens com `origem:"pc"` nunca sobem de volta. Regras de prazo copiadas de `rules.py`: mudou uma, mude a outra (`ui_local.py` compara). Prazo ISO (calendário/colar) validado por `chat.data_iso` e `dataIso()` em local.js; "limpar" tira o prazo.
 - Copiar/colar cards: formato texto em `cardsEmTexto`/`textoEmCards` (app.js); mudou um, mude o outro. Testes: ui_browser já põe `dumpbox.tour=1` (tutorial não abre).
 - Chat (`chat.py`): ações aplicadas na hora, só sobre item citado no pedido, sempre reversíveis (diário `alteracao`). Apagar de vez só pela Lixeira, nunca pela IA.
+- Bots (`canais/`): Telegram por long polling, WhatsApp por webhook `/api/canais/whatsapp` (segredo/HMAC, não o login); os dois só chamam `canais/base.tratar`. Lembretes: `lembretes.py`, worker 1x/min; trigger `reaviso` zera `item.avisado_em` quando prazo/lembrete muda. Planos: `docs/extras/`.
+- Busca do chat (RAG): `busca.py`, tabela `embedding`, modelo `paraphrase-multilingual`; medir com `PYTHONUTF8=1 python eval/run_eval_rag.py --chat`. Ollama sempre em `127.0.0.1` (localhost = +2 s no Windows).
 - Avaliar: `python eval/run_eval.py qwen2.5:1.5b` (precisa Ollama: `$env:OLLAMA_MODELS="D:\Ollama\models"; D:\Ollama\ollama.exe serve`)
 - Schema: `PYTHONUTF8=1 PYTHONPATH=backend python -m dumpbox.schema > schema/saida_ia.schema.json`
 

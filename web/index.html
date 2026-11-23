@@ -10,7 +10,7 @@
 <style>
 @font-face{font-family:Barlow;font-weight:500;font-display:swap;src:url(fonts/barlow-500.woff2) format("woff2")}
 @font-face{font-family:Barlow;font-weight:700;font-display:swap;src:url(fonts/barlow-700.woff2) format("woff2")}
-:root{--bg:#12140f;--panel:#1b1e17;--raise:#23271e;--line:#3b4133;--txt:#f0ecdd;--mute:#b1b29d;--sig:#ff7a2f;--ok:#a7d46a;--late:#ff4d6d;--ink:#14160f;--mono:ui-monospace,Consolas,"Roboto Mono",monospace}
+:root{--bg:#12140f;--panel:#1b1e17;--raise:#23271e;--line:#3b4133;--txt:#f0ecdd;--mute:#b1b29d;--sig:#ff7a2f;--ok:#a7d46a;--late:#ff4d6d;--med:#e8c547;--low:#8d9480;--ink:#14160f;--mono:ui-monospace,Consolas,"Roboto Mono",monospace}
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--txt);font:500 16px/1.3 Barlow,"Segoe UI",sans-serif}
@@ -74,6 +74,9 @@ main{margin-left:248px;padding:calc(18px + var(--topo,0px)) 28px 100px;max-width
 .c:hover,.c:focus-within{border-color:var(--txt)}
 .c.alta{background:var(--raise);border-left:4px solid var(--sig)}
 .c.critica{background:var(--raise);border-left:4px solid var(--late)}
+.semprazo{display:block;margin:-4px 0 8px;padding:4px 0;background:none;border:0;color:var(--late);font:500 13px var(--mono);cursor:pointer}.semprazo[hidden]{display:none}
+.c.media{border-left:4px solid var(--med)}.c.baixa{border-left:4px solid var(--low)}
+.media .sig{color:var(--med)}.media .sig .on{background:var(--med)}.baixa .sig{color:var(--low)}.baixa .sig .on{background:var(--low)}
 /* cor por tipo: faixa no topo + rótulo; a borda esquerda continua sendo da criticidade */
 .c{--tc:var(--mute);border-top:3px solid var(--tc)}.c:hover,.c:focus-within{border-top-color:var(--tc)}.c .k{color:var(--tc)}
 .t-tarefa{--tc:#6cb4ff}.t-compromisso{--tc:#c49bff}.t-ideia{--tc:#ffd75e}.t-compra{--tc:#4fd1b5}.t-nota{--tc:#b1b29d}

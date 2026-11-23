@@ -441,9 +441,10 @@ try:
         g.screenshot(path=SAIDA / "16-texto-no-card.png")
         card(te).hover(); card(te).locator("button.ed").click()
         ok(g.input_value("form.dlg input[type=date]") == "2026-12-10" and g.input_value("form.dlg input[type=time]") == "14:30", "Editar abre com o dia e a hora do prazo")
-        g.fill("form.dlg input[type=date]", "")
+        g.click("form.dlg .semprazo")
+        ok(g.input_value("form.dlg input[type=date]") == "" and g.locator("form.dlg .semprazo").is_hidden(), "× tirar o prazo limpa dia e hora")
         g.click(".nova .si"); g.wait_for_selector("form.dlg", state="detached"); time.sleep(.4)
-        ok(item(te)["prazo_em"] is None, "apagar o dia tira o prazo")
+        ok(item(te)["prazo_em"] is None, "salvar sem dia tira o prazo")
         # copiar (Ctrl+C na seleção) e Colar: o texto volta a virar cards iguais
         ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=URL)
         tc = g.eval_on_selector_all("#vista article.c h3", "a=>a.map(e=>e.textContent)")[:2]

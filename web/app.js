@@ -529,8 +529,12 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
   const linha2 = el("div", "duas"); linha2.append(campo("Pasta", pastaS), campo("Tipo", tipo));
   const linha3 = el("div", "duas"); linha3.append(campo("Prazo: dia", dia), campo("hora (opcional)", hora));
   const linha4 = el("div", "duas"); linha4.append(campo("ou escreva o prazo", prazo), campo("Criticidade", crit));
+  const semPrazo = el("button", "semprazo", "× tirar o prazo"); semPrazo.type = "button";  // salvar sem dia = "limpar" no servidor
+  semPrazo.onclick = () => { dia.value = hora.value = prazo.value = ""; semPrazo.hidden = true; };
+  semPrazo.hidden = !it?.prazo_em;
+  dia.addEventListener("input", () => { semPrazo.hidden = !dia.value && !prazo.value.trim(); });
   pe.append(no, si);
-  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), ckl, linha2, linha3, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), ckl, linha2, linha3, semPrazo, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----

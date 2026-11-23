@@ -1,6 +1,6 @@
 # Plano: celular offline-first com sincronização pelo Tailscale
 
-Status: **decidido em 2026-11-11, não implementado.** Variante A (réplica + fila de alterações).
+Status: **etapas 0-3 feitas em 2026-11-23** (cópia em localStorage, não IndexedDB). Falta o roteiro de bancada (passos 2-10). Variante A (réplica + fila de alterações).
 Itens marcados **[celular]** só podem ser testados com o aparelho na bancada.
 
 ## Objetivo
@@ -61,7 +61,7 @@ Service worker e armazenamento offline só rodam em HTTPS (ou localhost). Pelo I
   voltar online: fila zera e o banco tem a mudança.
 
 ## Roteiro de teste na bancada **[celular]**
-1. [ ] Etapa 0 completa: app instalado pelo endereço `https://...ts.net`.
+1. [x] Etapa 0 completa: app instalado pelo endereço `https://...ts.net`.
 2. [ ] Celular em modo avião: app abre e mostra os cards da última cópia.
 3. [ ] Offline: marcar um item como feito, mover outro, editar o título de um terceiro, criar uma nota. Faixa mostra 3 alterações + 1 nota.
 4. [ ] Fechar e reabrir o app ainda offline: mudanças e faixa continuam lá.

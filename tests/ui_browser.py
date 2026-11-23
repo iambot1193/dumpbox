@@ -640,6 +640,31 @@ try:
         m.wait_for_timeout(9500)
         m.screenshot(path=SAIDA / "8-celular-ia.png")
         ok(erros2 == [], f"console limpo no celular {erros2}")
+
+        # sem o PC (plano-sync): cópia + fila de alterações; ao voltar, /api/sync aplica por campo
+        ctx = b.new_context(viewport={"width": 412, "height": 915}, is_mobile=True, has_touch=True)  # service worker ligado: casco offline
+        ctx.add_init_script("localStorage.setItem('dumpbox.tour', '1')")
+        o = ctx.new_page()
+        o.goto(URL)
+        o.fill("#senha", "senha-de-teste"); o.click("#entrar")
+        o.wait_for_selector("#nav .fold")
+        o.evaluate("navigator.serviceWorker.ready"); o.reload(); o.wait_for_selector("#nav .fold")  # 2ª carga já passa pelo cache do casco
+        cafe, luz = ids["Comprar café e pão"], ids["Pagar conta de luz"]
+        ctx.set_offline(True)
+        o.evaluate(f"editar([{luz}], 'prioridade', 'critica')")
+        o.evaluate(f"api('/api/itens/{cafe}/editar', {{mudancas: {{titulo: 'Café, pão e leite'}}}}).then(() => {{ ultimo = ''; return atualizar(); }})")
+        o.wait_for_selector("#toast >> text=Sem o PC")
+        ok("2 alterações aguardando o PC" in o.locator("#st").inner_text(), "faixa conta as alterações offline")
+        o.reload(); o.wait_for_selector("#nav .fold")
+        o.locator("#nav .fold", has_text="Casa").click()
+        ok(o.locator(".c", has_text="Café, pão e leite").count() == 1 and "2 alterações" in o.locator("#st").inner_text(),
+           "offline e recarregado: cópia com a mudança e a fila continuam")
+        c.execute("UPDATE item SET contexto='trabalho' WHERE id=?", (cafe,)); c.commit()  # no PC, enquanto o celular está sem rede
+        ctx.set_offline(False)
+        o.wait_for_function("!document.querySelector('#st').innerText.includes('alteraç')", timeout=15000)
+        cf, lz = (c.execute("SELECT titulo, contexto, prioridade FROM item WHERE id=?", (i,)).fetchone() for i in (cafe, luz))
+        ok(tuple(cf)[:2] == ("Café, pão e leite", "trabalho") and lz["prioridade"] == "critica",
+           f"voltou a rede: fila zera, título do celular e pasta do PC ficam os dois {tuple(cf)} {tuple(lz)}")
         b.close()
 finally:
     srv.terminate()

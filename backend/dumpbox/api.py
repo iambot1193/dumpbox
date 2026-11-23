@@ -254,6 +254,68 @@ def editar_itens(body: Edicao, c=Depends(conexao)):
     return {"grupo": grupo, "descricao": descricao, "n": n}
 
 
+class AltOffline(BaseModel):
+    id: str = Field(min_length=8, max_length=64)
+    item_id: int
+    campo: Literal["estado", "prazo", "contexto", "prioridade", "titulo", "tipo", "repete", "detalhe", "grade"]
+    valor: str | None = None
+    quando: datetime
+
+
+class Sync(BaseModel):
+    agora_cliente: datetime
+    alteracoes: list[AltOffline] = Field(max_length=2000)
+
+
+@app.post("/api/sync", dependencies=[Depends(exige_login)])
+def sincronizar(body: Sync, c=Depends(conexao)):
+    """Fila de edições feitas no celular sem o PC. Por campo, o mais recente vence (servidor: diário `alteracao`
+    ou criado_em do item); id repetido não aplica 2x; o relógio do celular é corrigido pela diferença de agora."""
+    desvio = datetime.now() - body.agora_cliente.replace(tzinfo=None)
+    grupo, res = str(uuid.uuid4()), {"aplicadas": 0, "ignoradas_antigas": 0, "invalidas": 0, "repetidas": 0}
+    for a in sorted(body.alteracoes, key=lambda a: a.quando):
+        if c.execute("SELECT 1 FROM sync_recebido WHERE id=?", (a.id,)).fetchone():
+            res["repetidas"] += 1
+            continue
+        c.execute("INSERT INTO sync_recebido(id, criado_em) VALUES(?,?)", (a.id, db.agora()))
+        quando = a.quando.replace(tzinfo=None) + desvio
+        item = c.execute("SELECT criado_em FROM item WHERE id=?", (a.item_id,)).fetchone()
+        if not item:
+            res["invalidas"] += 1
+            continue
+        if a.campo == "grade":  # ponytail: posição na grade não tem diário; a última enviada vence
+            try:
+                p = json.loads(a.valor or "")
+                c.execute("UPDATE item SET grade_col=?, grade_lin=?, grade_larg=?, grade_alt=? WHERE id=?",
+                          (int(p["col"]), int(p["lin"]), int(p["larg"]), int(p["alt"]), a.item_id))
+                res["aplicadas"] += 1
+            except (ValueError, KeyError, TypeError):
+                res["invalidas"] += 1
+            continue
+        col = chat._COLUNA[a.campo]
+        ultima = c.execute("SELECT MAX(criado_em) FROM alteracao WHERE item_id=? AND campo=? AND desfeito=0",
+                           (a.item_id, col)).fetchone()[0] or item["criado_em"]
+        if quando <= datetime.fromisoformat(ultima):
+            res["ignoradas_antigas"] += 1
+            continue
+        try:
+            if a.campo in ("repete", "detalhe") or (a.campo == "prazo" and a.valor == "limpar"):
+                v = None if a.valor == "limpar" else (a.valor or "").strip() or None
+                if a.campo == "repete" and v not in (None, *chat.REPETE) or len(v or "") > 2000:
+                    raise ValueError("valor inválido")
+                n = chat._mudar(c, a.item_id, a.campo, v, grupo, None)
+            else:
+                n = chat.aplicar(c, chat.validar(c, chat.Acao(tipo=a.campo, item_id=a.item_id, valor=a.valor), quando)[0], grupo)
+            if n:  # diário com a hora em que foi feito no celular: a próxima comparação usa essa hora
+                c.execute("UPDATE alteracao SET criado_em=? WHERE grupo=? AND item_id=? AND campo=?",
+                          (quando.isoformat(timespec="seconds"), grupo, a.item_id, col))
+            res["aplicadas"] += bool(n)
+        except ValueError:
+            res["invalidas"] += 1
+    c.commit()
+    return res
+
+
 class EdicaoCard(BaseModel):
     mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete", "detalhe"], str] = Field(min_length=1)
 

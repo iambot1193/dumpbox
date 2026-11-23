@@ -17,7 +17,7 @@ Notas soltas → IA cataloga. Servidor no PC (FastAPI+SQLite+Ollama qwen2.5:7b) 
 - Schema: `PYTHONUTF8=1 PYTHONPATH=backend python -m dumpbox.schema > schema/saida_ia.schema.json`
 
 ## Regras
-- Servidor (SQLite) é a fonte da verdade; navegador só guarda fila offline de capturas. Exceção: modo celular (Pages) guarda tudo no aparelho até existir o envio ao PC.
+- Servidor (SQLite) é a fonte da verdade; navegador guarda fila de capturas, cópia da lista e fila de alterações (`POST /api/sync`, mais recente vence por campo). Exceção: modo celular (Pages) guarda tudo no aparelho até existir o envio ao PC.
 - Datas e prioridade por regra (`rules.py`), nunca pela IA.
 - Repo público: nada em `data/private/`, `.env`, `.gguf`.
 - Arquivos pesados em D:, nunca no C:.

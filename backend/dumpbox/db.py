@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS alteracao(  -- diário de edições automáticas: bas
   id INTEGER PRIMARY KEY AUTOINCREMENT, grupo TEXT NOT NULL, captura_id TEXT, item_id INTEGER NOT NULL,
   campo TEXT NOT NULL, antes TEXT, depois TEXT, descricao TEXT, criado_em TEXT NOT NULL,
   desfeito INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sync_recebido(  -- ids de alterações offline já tratadas: reenvio não aplica 2x
+  id TEXT PRIMARY KEY, criado_em TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pasta(  -- pastas = contexto do item; o usuário cria e apaga
   slug TEXT PRIMARY KEY, nome TEXT NOT NULL, descricao TEXT NOT NULL DEFAULT '', ordem INTEGER NOT NULL, criado_em TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS imagem(  -- foto esperando a IA; apagada depois que vira itens

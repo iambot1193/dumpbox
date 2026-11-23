@@ -400,6 +400,48 @@ def test_ia_aprende_reorganiza_e_whatsapp():
     assert db.exemplos(conn) == ""
 
 
+def test_sync_offline():
+    """Fila do celular sem o PC: por campo, o mais recente vence; id repetido não aplica 2x; relógio corrigido."""
+    from datetime import timedelta
+    c = TestClient(api.app)
+    auth._tentativas.clear()
+    assert c.post("/api/login", json={"senha": "senha-certa"}).status_code == 200
+    conn = db.conectar()
+    for t in ("Sync A", "Sync B"):
+        assert c.post("/api/itens", json={"titulo": t, "contexto": "casa", "tipo": "tarefa"}).status_code == 200
+    a, b = (conn.execute("SELECT id FROM item WHERE titulo=?", (t,)).fetchone()[0] for t in ("Sync A", "Sync B"))
+    agora = datetime.now()
+    iso = lambda d: d.isoformat(timespec="seconds")
+    alt = lambda i, item, campo, valor, quando: {"id": f"sync-{i:04d}", "item_id": item, "campo": campo, "valor": valor, "quando": iso(quando)}
+    sync = lambda alts, rel=agora: c.post("/api/sync", json={"agora_cliente": iso(rel), "alteracoes": alts}).json()
+    # celular mudou o título de A; o PC mudou a pasta de A: campos diferentes, ficam os dois
+    c.post("/api/itens/editar", json={"ids": [a], "campo": "contexto", "valor": "trabalho"})
+    r = sync([alt(1, a, "titulo", "Sync A do celular", agora + timedelta(seconds=2))])
+    assert r["aplicadas"] == 1, r
+    assert tuple(conn.execute("SELECT titulo, contexto FROM item WHERE id=?", (a,)).fetchone()) == ("Sync A do celular", "trabalho")
+    # mesmo campo: o PC mudou a prioridade agora; a do celular é de antes: fica a do PC
+    c.post("/api/itens/editar", json={"ids": [b], "campo": "prioridade", "valor": "baixa"})
+    r = sync([alt(2, b, "prioridade", "alta", agora - timedelta(minutes=5))])
+    assert r["ignoradas_antigas"] == 1 and conn.execute("SELECT prioridade FROM item WHERE id=?", (b,)).fetchone()[0] == "baixa"
+    # mais nova que a do PC: aplica; reenviar o mesmo id não aplica de novo
+    r = sync([alt(3, b, "prioridade", "critica", agora + timedelta(seconds=5))], agora)
+    assert r["aplicadas"] == 1 and sync([alt(3, b, "prioridade", "critica", agora + timedelta(seconds=5))])["repetidas"] == 1
+    # relógio do celular 1 h adiantado: "quando" dele (agora+1h-1min) é na verdade 1 min atrás = mais velho que a do PC
+    c.post("/api/itens/editar", json={"ids": [b], "campo": "prioridade", "valor": "media"})
+    r = sync([alt(4, b, "prioridade", "alta", agora + timedelta(minutes=59))], agora + timedelta(hours=1))
+    assert r["ignoradas_antigas"] == 1 and conn.execute("SELECT prioridade FROM item WHERE id=?", (b,)).fetchone()[0] == "media"
+    # inválido é recusado e o resto do envio aplica; feito, limpar prazo e grade funcionam
+    c.post(f"/api/itens/{a}/editar", json={"mudancas": {"prazo": "amanhã"}})
+    depois = datetime.now() + timedelta(seconds=30)
+    r = sync([alt(5, a, "prioridade", "urgentíssima", depois), alt(6, a, "estado", "feito", depois), alt(7, a, "prazo", "limpar", depois),
+              alt(8, b, "grade", '{"col":2,"lin":3,"larg":1,"alt":1}', depois), alt(9, 999999, "titulo", "x", depois)], depois)
+    assert (r["invalidas"], r["aplicadas"]) == (2, 3), r
+    assert tuple(conn.execute("SELECT estado, prazo_em FROM item WHERE id=?", (a,)).fetchone()) == ("feito", None)
+    assert tuple(conn.execute("SELECT grade_col, grade_lin FROM item WHERE id=?", (b,)).fetchone()) == (2, 3)
+    # tudo aplicado entra no diário (Desfazer)
+    assert conn.execute("SELECT COUNT(*) FROM alteracao WHERE item_id=? AND campo='titulo' AND depois='Sync A do celular'", (a,)).fetchone()[0] == 1
+
+
 def test_pastas_criar_usar_apagar():
     import json
 
@@ -683,6 +725,7 @@ if __name__ == "__main__":
     test_instrucao_sem_acao_vai_para_revisar()
     test_ia_aprende_reorganiza_e_whatsapp()
     test_pastas_criar_usar_apagar()
+    test_sync_offline()
     test_primeiro_uso_e_modelo()
     test_rate_limit_e_token()
     print("ok")

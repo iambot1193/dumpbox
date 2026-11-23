@@ -40,9 +40,16 @@ function botao(cls, conteudo, rotulo, fn) {
 }
 
 async function api(url, body) {
-  const r = await fetch(url, { method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body) });
+  let r;
+  try {
+    r = await fetch(url, { method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch (e) {  // sem rede (TypeError): edições vão para a fila do aparelho; o resto espera o PC
+    const o = body !== undefined && e instanceof TypeError && offline(url, body);
+    if (o) return o;
+    throw e;
+  }
   if (r.status === 401) { mostra("login"); throw new Error("401"); }
   if (!r.ok) {
     const e = new Error(r.status);
@@ -70,10 +77,41 @@ async function estado() {
   }
 }
 
+// ---- sem o PC (docs/plano-sync.md): cópia da última lista + fila de alterações; ao voltar, POST /api/sync ----
+// ponytail: localStorage (~5 MB, sobra para milhares de cards); IndexedDB se um dia faltar espaço
+const COPIA = "dumpbox.copia", ALT = "dumpbox.alteracoes";
+const lerAlt = () => { try { return JSON.parse(localStorage.getItem(ALT) || "[]"); } catch { return []; } };
+const gravaAlt = a => { try { localStorage.setItem(ALT, JSON.stringify(a)); } catch {} };
+const guardaCopia = () => { try { localStorage.setItem(COPIA, JSON.stringify(D)); } catch {} };
+function aplicaLocal(a) {
+  const i = D.itens.find(x => x.id === a.item_id);
+  if (!i) return;
+  if (a.campo === "grade") { const p = JSON.parse(a.valor); Object.assign(i, { grade_col: p.col, grade_lin: p.lin, grade_larg: p.larg, grade_alt: p.alt }); }
+  else if (a.campo === "prazo") { if (a.valor === "limpar") i.prazo_em = null; else if (/^\d{4}-/.test(a.valor)) i.prazo_em = a.valor; }  // "amanhã": o PC resolve
+  else i[a.campo] = a.valor || null;
+  if (a.campo === "estado" && a.valor === "arquivado") {
+    D.itens = D.itens.filter(x => x !== i);
+    D.lixeira.unshift({ id: i.id, titulo: i.titulo, contexto: i.contexto, tipo: i.tipo });
+  }
+}
+function offline(url, body) {  // devolve a resposta "de mentira" ou null (rota que só o PC faz: criar pasta, chat, apagar de vez...)
+  const m = url.match(/^\/api\/itens\/(\d+)\/editar$/), quando = horaLocal(), novas = [];
+  const add = (item_id, campo, valor) => novas.push({ id: uuid(), item_id, campo, valor, quando });
+  if (url === "/api/itens/editar") body.ids.forEach(i => add(i, body.campo, body.valor));
+  else if (m) for (const [k, v] of Object.entries(body.mudancas)) add(+m[1], k, v);
+  else if (url === "/api/layout") body.itens.forEach(p => add(p.id, "grade", JSON.stringify(p)));
+  else return null;
+  gravaAlt([...lerAlt(), ...novas]);
+  novas.forEach(aplicaLocal); guardaCopia(); mostrarFila();
+  if (url !== "/api/layout") toast("Sem o PC: guardado neste aparelho, vai quando ele voltar");
+  return { grupo: null, descricao: null, n: novas.length, ok: true };
+}
+
 function mostrarFila() {
-  const q = lerFila().length, p = D.revisar.filter(c => c.status === "pendente").length, partes = [];
+  const q = lerFila().length, a = lerAlt().length, p = D.revisar.filter(c => c.status === "pendente").length, partes = [];
   if (p) partes.push(`processando ${p} nota${p > 1 ? "s" : ""}`);
   if (q) partes.push(`${q} na fila, aguardando o PC`);
+  if (a) partes.push(`${a} alteraç${a > 1 ? "ões" : "ão"} aguardando o PC`);
   $("st").replaceChildren(...(partes.length ? [ic("spin"), partes.join(" · ")] : []));
 }
 async function enviarFila() {
@@ -81,6 +119,13 @@ async function enviarFila() {
   for (const n of [...fila]) {
     try { await api(n.imagem ? "/api/capturas/imagem" : "/api/capturas", n); fila = fila.filter(x => x.id !== n.id); gravaFila(fila); }
     catch (e) { if (String(e.message) === "401") return; break; }
+  }
+  const alts = lerAlt();
+  if (alts.length) {
+    try { await api("/api/sync", { agora_cliente: horaLocal(), alteracoes: alts }); }
+    catch (e) { if (String(e.message) !== "422") return mostrarFila(); toast("O PC recusou alterações feitas sem ele."); }  // 422: nunca vai passar, não trava a fila
+    const ids = new Set(alts.map(a => a.id));
+    gravaAlt(lerAlt().filter(a => !ids.has(a.id))); ultimo = "";
   }
   mostrarFila();
 }
@@ -956,7 +1001,7 @@ function desenhaNav() {
       { txt: "Ajuda", fn: () => tutorial() },
       ...(window.DUMPBOX_LOCAL ? [] : [{ txt: "Conectar celular", fn: conectarCelular }, { txt: "Cópia p/ celular", fn: () => { location.href = "api/copia"; } }]),
       ...(window.DUMPBOX_PC ? [{ txt: "Desconectar do PC", fn: () => { localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload(); } }] : []),
-      { txt: "Sair", fn: async () => { await api("/api/logout", {}); mostra("login"); } },
+      { txt: "Sair", fn: async () => { try { localStorage.removeItem(COPIA); } catch {} await api("/api/logout", {}); mostra("login"); } },
     ]); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,
     ...PASTAS.map(([p, n]) => linha(p, [n], abertos.filter(i => pasta(i) === p).length, true)),
@@ -992,12 +1037,18 @@ async function atualizar() {
     const s = JSON.stringify(r);
     if (gesto || menuAberto || dlgAberto) return;  // não redesenha no meio de um arraste ou menu
     if (s !== ultimo) {
-      ultimo = s; D = r;
+      ultimo = s; D = r; lerAlt().forEach(aplicaLocal); guardaCopia();  // o que ainda não subiu continua na tela
       if (r.pastas?.length) { PASTAS = r.pastas.map(p => [p.slug, p.nome]); NOME = Object.fromEntries(PASTAS); }
       render();
     }
     mostrarFila(); avisarVencidos();
-  } catch (e) { if (!/^(401|Failed to fetch)/.test(e.message)) console.error("atualizar:", e); }
+  } catch (e) {
+    if (e instanceof TypeError && !ultimo && !(gesto || menuAberto || dlgAberto)) {  // sem o PC: mostra a última cópia
+      if (!D.itens.length) try { const cp = JSON.parse(localStorage.getItem(COPIA)); if (cp?.itens) D = cp; } catch {}
+      if (D.pastas?.length) { PASTAS = D.pastas.map(p => [p.slug, p.nome]); NOME = Object.fromEntries(PASTAS); }
+      ultimo = "copia"; render(); mostrarFila();
+    } else if (!/^(401|Failed to fetch)/.test(e.message)) console.error("atualizar:", e);
+  }
 }
 
 // ---- avisos de tarefa vencida: notificação do navegador quando o prazo passa ----

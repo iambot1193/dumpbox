@@ -105,13 +105,18 @@ Proposta só é aplicada se `base_rev == rev` atual e nunca sobrescreve campo ma
 4. Experimento de IA no celular com benchmark
 5. Extras: embeddings, OCR, export Obsidian, SQLCipher
 
-## Próximo desenho: celular offline-first (decidido, não implementado)
-PC continua fonte da verdade; celular guarda cópia + fila de alterações e sincroniza pelo Tailscale (HTTPS via `tailscale serve`),
-o mais recente vence por campo. Plano completo e roteiro de teste: [plano-sync.md](plano-sync.md).
-(Substitui o desenho anterior "celular fonte da verdade, PC só IA, sem sincronização".)
+## Sem o PC: cópia + fila de alterações (implementado 23/11/2026)
+PC continua fonte da verdade. No navegador (celular conectado ou o próprio PC com o servidor fora): `dumpbox.copia` = última
+resposta de `/api/itens` (mostrada quando a API não responde); `dumpbox.alteracoes` = fila `{id, item_id, campo, valor, quando}`.
+`api()` em app.js: POST de edição (`/api/itens/editar`, `/api/itens/{id}/editar`, `/api/layout`) que falha por rede (TypeError)
+vira fila + mudança na cópia (`offline()`/`aplicaLocal()`); o resto (pasta, chat, apagar de vez) espera o PC.
+`enviarFila()` manda notas e depois `POST /api/sync`: por campo, o mais recente vence (diário `alteracao` ou `criado_em`),
+`sync_recebido` barra id repetido, relógio do celular corrigido pela diferença de `agora_cliente`. Grade: a última enviada vence (sem diário).
+Pendências aceitas: Desfazer de algo ainda na fila; prazo em texto ("amanhã") só aparece depois que o PC resolve.
+Plano e roteiro de bancada: [plano-sync.md](plano-sync.md).
 
 ## Pendências
-1. Sincronização celular↔PC: [plano-sync.md](plano-sync.md).
+1. Roteiro de bancada do sync no celular real ([plano-sync.md](plano-sync.md), passos 2-10).
 2. Demo clicável no GitHub Pages; limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
 3. Bot do Telegram para lembretes (sem código ainda; testar contra um Telegram falso).
 4. Qualidade: pasta 91%, texto riscado na foto 76%, efeito da instrução junto com a foto não medido.

@@ -2,11 +2,10 @@
 Liga sozinho se DUMPBOX_TG_TOKEN e DUMPBOX_TG_PERMITIDOS (chat_ids, vírgula) estiverem no config.env."""
 import os
 import threading
-from datetime import datetime
 
 import httpx
 
-from .. import config, db, lembretes
+from .. import config, db
 from . import base
 
 OFFSET = config.HOME / "telegram.offset"  # reiniciar não repete mensagens
@@ -60,19 +59,13 @@ def _ler_offset() -> int:
 
 def rodar(parar: threading.Event, bot: Bot) -> None:
     c = db.conectar()
-    offset, ultimo_resumo = _ler_offset(), None
-    resumo_hora = os.getenv("DUMPBOX_TG_RESUMO", "")  # "08:00" = resumo diário; vazio = sem
+    offset = _ler_offset()
     while not parar.is_set():
         try:
             novo = bot.uma_vez(c, offset, espera=20 if bot.esperando else 30)
             if novo != offset:
                 offset = novo
                 OFFSET.write_text(str(offset))
-            lembretes.avisar(c, bot.avisar_todos)
-            agora = datetime.now()
-            if resumo_hora and f"{agora:%H:%M}" >= resumo_hora and ultimo_resumo != agora.date():
-                bot.avisar_todos(lembretes.resumo(c, agora))
-                ultimo_resumo = agora.date()
         except Exception:  # rede caiu, token errado: tenta de novo sem derrubar o servidor
             parar.wait(15)
 
@@ -87,8 +80,13 @@ def iniciar(parar: threading.Event) -> bool:
     permitidos = {p.strip() for p in os.getenv("DUMPBOX_TG_PERMITIDOS", "").split(",") if p.strip()}
     if not token or not permitidos:
         return False
-    threading.Thread(target=rodar, args=(parar, Bot(token, permitidos)), daemon=True).start()
+    global ATIVO
+    ATIVO = Bot(token, permitidos)
+    threading.Thread(target=rodar, args=(parar, ATIVO), daemon=True).start()
     return True
+
+
+ATIVO: Bot | None = None  # lembretes usam (api._avisos)
 
 
 if __name__ == "__main__":  # python -m dumpbox.canais.telegram: grava token e seu chat_id no config.env

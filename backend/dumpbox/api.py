@@ -12,13 +12,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, tailnet, visao
-from .canais import telegram
+from . import lembretes
+from .canais import telegram, whatsapp
 from .schema import Tipo
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
@@ -45,11 +46,32 @@ def processar_pendentes(c) -> int:
     return n
 
 
+def _avisos(texto: str) -> None:
+    """Lembrete para todos os bots ligados. Falhou algum: levanta, e o lembrete fica pendente para o próximo minuto."""
+    if telegram.ATIVO:
+        telegram.ATIVO.avisar_todos(texto)
+    if whatsapp.provedor():
+        whatsapp.aviso(texto)
+
+
+def _lembrar(c, estado: dict) -> None:
+    agora = datetime.now()
+    if (telegram.ATIVO or whatsapp.provedor()) and time.monotonic() - estado.get("t", -99) >= 60:
+        estado["t"] = time.monotonic()
+        lembretes.avisar(c, _avisos, agora)
+        hora = os.getenv("DUMPBOX_TG_RESUMO", "")  # "08:00" = resumo diário pelos bots
+        if hora and f"{agora:%H:%M}" >= hora and estado.get("dia") != agora.date():
+            estado["dia"] = agora.date()
+            _avisos(lembretes.resumo(c, agora))
+
+
 def _worker(parar: threading.Event) -> None:
     c = db.conectar()
+    estado: dict = {}
     while not parar.is_set():
         try:
             db.backup_diario(c)  # no máximo 1 por dia; barato quando já existe
+            _lembrar(c, estado)
             if not ollama_mgr.pronto() or not processar_pendentes(c):  # IA ainda preparando: notas ficam pendentes
                 parar.wait(2)
         except Exception:  # worker nunca morre; erro de uma nota não derruba as outras
@@ -530,6 +552,44 @@ def conversar(body: MsgChat, c=Depends(conexao)):
         return chat.conversar(c, body.mensagem, [t.model_dump() for t in body.historico])
     except RuntimeError:
         raise HTTPException(503, "modelo indisponível (Ollama ligado?)")
+
+
+@app.get("/api/canais/whatsapp")
+def zap_verificar(request: Request):
+    """Cloud API: a Meta confirma o webhook mandando hub.verify_token e espera o hub.challenge de volta."""
+    q, prov = request.query_params, whatsapp.provedor()
+    if not isinstance(prov, whatsapp.CloudAPI) or not prov.verificar or q.get("hub.verify_token") != prov.verificar:
+        raise HTTPException(403)
+    return Response(q.get("hub.challenge", ""), media_type="text/plain")
+
+
+def _zap_responder(prov, payload) -> None:
+    c = db.conectar()
+    try:
+        respostas = whatsapp.tratar_todas(c, prov, payload, whatsapp.permitidos())
+    finally:
+        c.close()
+    for numero, texto in respostas:
+        try:
+            prov.enviar(numero, texto)
+        except Exception:
+            pass  # a nota já foi salva; só a confirmação não chegou
+
+
+@app.post("/api/canais/whatsapp")
+async def zap_webhook(request: Request, tarefas: BackgroundTasks):
+    """Login da tela não vale aqui: o provedor autentica por segredo (Evolution) ou assinatura HMAC (Cloud API)."""
+    prov, corpo = whatsapp.provedor(), await request.body()
+    hd = dict(request.headers)  # Evolution no webhook global não manda header próprio: aceita o segredo em ?s=
+    hd.setdefault("x-dumpbox-segredo", request.query_params.get("s", ""))
+    if prov is None or not prov.autentico(hd, corpo):
+        raise HTTPException(401)
+    try:
+        payload = json.loads(corpo)
+    except ValueError:
+        raise HTTPException(400)
+    tarefas.add_task(_zap_responder, prov, payload)  # roda em thread depois do 200 (IA pode demorar): a Meta reenvia se passar de ~10 s
+    return {"ok": True}
 
 
 app.mount("/", StaticFiles(directory=WEB, html=True), name="web")

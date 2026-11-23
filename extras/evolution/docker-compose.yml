@@ -1,0 +1,25 @@
+# Evolution API (WhatsApp NÃO oficial, pareia por QR). Use um número separado: há risco de bloqueio.
+# Subir:  docker compose up -d     (volumes em D:, nunca no C:)
+# Conferir variáveis na doc da versão: https://doc.evolution-api.com
+services:
+  evolution:
+    image: atendai/evolution-api:v2.2.3
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"]  # só localhost: nada exposto na rede
+    environment:
+      AUTHENTICATION_API_KEY: ${DUMPBOX_ZAP_CHAVE:?defina DUMPBOX_ZAP_CHAVE no .env}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evo:evo@postgres:5432/evolution
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      # webhook para o dumpbox (o container chega no PC por host.docker.internal)
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_URL: http://host.docker.internal:8000/api/canais/whatsapp?s=${DUMPBOX_ZAP_SEGREDO:?defina DUMPBOX_ZAP_SEGREDO}
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+    volumes: ["D:/dumpbox-evolution/instances:/evolution/instances"]
+    depends_on: [postgres]
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: {POSTGRES_USER: evo, POSTGRES_PASSWORD: evo, POSTGRES_DB: evolution}
+    volumes: ["D:/dumpbox-evolution/pg:/var/lib/postgresql/data"]

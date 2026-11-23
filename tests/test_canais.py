@@ -95,7 +95,51 @@ def test_telegram_polling():
     assert not bot.esperando
 
 
+def _zap(remote, texto, msg_id, from_me=False):
+    return {"event": "messages.upsert", "instance": "dumpbox",
+            "data": {"key": {"remoteJid": remote, "fromMe": from_me, "id": msg_id}, "message": {"conversation": texto}}}
+
+
+def test_whatsapp():
+    import hashlib
+    import hmac as h
+    os.environ["DUMPBOX_WORKER"] = "0"
+    os.environ["DUMPBOX_ZAP_PERMITIDOS"] = "+55 11 90000-0001"
+    from fastapi.testclient import TestClient
+    from dumpbox import api
+    from dumpbox.canais import whatsapp
+    enviados = []
+    falso = httpx.Client(transport=httpx.MockTransport(lambda r: enviados.append(json.loads(r.content)) or httpx.Response(200, json={})))
+    evo = whatsapp.Evolution("http://evo", "dumpbox", "k", "segredo-zap", falso)
+    whatsapp.provedor = lambda: evo
+    t = TestClient(api.app)
+    eu = "5511900000001@s.whatsapp.net"
+    assert t.post("/api/canais/whatsapp", json=_zap(eu, "oi", "A1")).status_code == 401, "sem segredo"
+    hd = {"x-dumpbox-segredo": "segredo-zap"}
+    assert t.post("/api/canais/whatsapp", json=_zap(eu, "trocar óleo do carro", "A1"), headers=hd).status_code == 200
+    assert enviados[-1] == {"number": "5511900000001", "text": "anotado ✓"}
+    c = db.conectar()
+    assert c.execute("SELECT origem FROM captura WHERE id='zap-5511900000001-A1'").fetchone()["origem"] == "whatsapp"
+    n = len(enviados)
+    t.post("/api/canais/whatsapp", json=_zap(eu, "trocar óleo do carro", "A1"), headers=hd)  # reenvio
+    t.post("/api/canais/whatsapp", json=_zap(eu, "resposta do bot", "A2", from_me=True), headers=hd)  # loop
+    t.post("/api/canais/whatsapp", json=_zap("5511988887777@s.whatsapp.net", "estranho", "A3"), headers=hd)
+    t.post("/api/canais/whatsapp", json=_zap("123-456@g.us", "grupo", "A4"), headers=hd)
+    assert len(enviados) == n and c.execute("SELECT COUNT(*) FROM captura WHERE origem='whatsapp'").fetchone()[0] == 1
+
+    cloud = whatsapp.CloudAPI("tk", "999", "app-secret", "verifica-123", falso)
+    whatsapp.provedor = lambda: cloud
+    assert t.get("/api/canais/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "verifica-123", "hub.challenge": "42"}).text == "42"
+    assert t.get("/api/canais/whatsapp", params={"hub.verify_token": "errado", "hub.challenge": "42"}).status_code == 403
+    corpo = json.dumps({"entry": [{"changes": [{"value": {"messages": [
+        {"from": "5511900000001", "id": "wamid.X", "type": "text", "text": {"body": "comprar ração"}}]}}]}]}).encode()
+    ass = "sha256=" + h.new(b"app-secret", corpo, hashlib.sha256).hexdigest()
+    assert t.post("/api/canais/whatsapp", content=corpo, headers={"x-hub-signature-256": "sha256=00"}).status_code == 401, "assinatura inválida"
+    assert t.post("/api/canais/whatsapp", content=corpo, headers={"x-hub-signature-256": ass}).status_code == 200
+    assert enviados[-1]["to"] == "5511900000001" and enviados[-1]["text"]["body"] == "anotado ✓"
+
+
 if __name__ == "__main__":
-    for t in (test_tratar, test_lembretes, test_telegram_polling):
+    for t in (test_tratar, test_lembretes, test_telegram_polling, test_whatsapp):
         t()
         print("ok", t.__name__)

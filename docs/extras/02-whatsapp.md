@@ -1,5 +1,16 @@
 # Extra 2: WhatsApp
 
+> **Implementado** (`canais/whatsapp.py`, webhook `POST /api/canais/whatsapp`, testes em `tests/test_canais.py`).
+> Ligar no `config.env`: `DUMPBOX_ZAP=evolution` (ou `cloud`), `DUMPBOX_ZAP_PERMITIDOS=5511...`, e
+> - Evolution: `DUMPBOX_ZAP_CHAVE`, `DUMPBOX_ZAP_SEGREDO`, `DUMPBOX_ZAP_URL` (padrão `http://127.0.0.1:8080`),
+>   `DUMPBOX_ZAP_INSTANCIA` (padrão `dumpbox`). Subir com `extras/evolution/docker-compose.yml`, parear pelo QR
+>   do painel da Evolution. O segredo vai na URL do webhook (`?s=`), porque o webhook global não manda header próprio.
+>   Como o container chama o PC por `host.docker.internal`, o dumpbox precisa escutar nesse endereço
+>   (`--host 0.0.0.0` e firewall só para a rede do Docker), já que no `127.0.0.1` o Docker não chega.
+> - Cloud API: `DUMPBOX_ZAP_TOKEN`, `DUMPBOX_ZAP_TELEFONE_ID`, `DUMPBOX_ZAP_APP_SECRET`, `DUMPBOX_ZAP_VERIFICAR`.
+>   Lembrete fora da janela de 24 h precisa de template aprovado (não feito).
+> Lembretes vão para todos os bots ligados (worker, 1x por minuto).
+
 ## Objetivo
 As mesmas quatro funções do bot do Telegram (nota, lembrete, `?` para a IA e
 comandos), só que no WhatsApp. **Zero lógica nova**: o canal chama `canais/base.tratar`
@@ -60,7 +71,7 @@ demorar mais de ~10 s).
 ## Pronto quando
 - [ ] Nota e encaminhamento de conversa pelo WhatsApp viram itens
 - [ ] Lembrete chega pelo WhatsApp (Evolution)
-- [ ] Classe `CloudAPI` com teste de assinatura, mesmo sem conta Meta ativa
+- [x] Classe `CloudAPI` com teste de assinatura, mesmo sem conta Meta ativa
 - [ ] README: aviso do risco da Evolution + passo a passo do Docker
 
 ## Fora de escopo

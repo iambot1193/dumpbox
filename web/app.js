@@ -553,6 +553,32 @@ const botaoColar = () => botao("bcolar", [ic("paste"), "Colar"], "Criar cards do
 const botaoSel = () => botao("bsel" + (modoSel ? " on" : ""), ["Selecionar"], "Selecionar vários (no PC: Ctrl+clique, Shift+clique, Ctrl+A)",
   e => { modoSel = !modoSel; if (!modoSel) sel.clear(); e.currentTarget.classList.toggle("on", modoSel); marcarSel(); });
 
+// QR para o celular: abre o modo celular (Pages) já apontando para este PC; lá só falta a senha
+const PAGES = "https://iambot1193.github.io/dumpbox/";
+async function conectarCelular() {
+  let r;
+  try { r = await api("/api/endereco"); } catch { return toast("Não consegui perguntar ao PC o endereço do Tailscale."); }
+  dlgAberto = true;
+  const v = el("div", "veu"), d = el("div", "dlg"), fim = () => { v.remove(); d.remove(); dlgAberto = false; };
+  const ok = el("button", "no", "Fechar"); ok.onclick = fim; v.onclick = fim;
+  d.onkeydown = e => { if (e.key === "Escape") fim(); };
+  d.append(el("h4", "", "Conectar celular"));
+  if (r.url) {
+    if (!window.qrcode) await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "qrcode.js"; s.onload = res; s.onerror = rej; document.head.append(s); });
+    const alvo = PAGES + "?pc=" + encodeURIComponent(r.url), q = qrcode(0, "M");
+    q.addData(alvo); q.make();
+    const img = el("div", "qr"); img.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+    d.append(el("p", "", "1. Celular com o Tailscale ligado, na mesma conta deste PC."),
+      el("p", "", "2. Aponte a câmera para o código e abra o link."), el("p", "", "3. Digite a senha do dumpbox."), img,
+      el("p", "", r.url));
+  } else {
+    d.append(el("p", "", r.erro));
+    if (r.link) { const a = el("a", "", r.link); a.href = r.link; a.target = "_blank"; const p = el("p"); p.append(a); d.append(p); }
+  }
+  const pe = el("div"); pe.append(ok); d.append(pe);
+  document.body.append(v, d); ok.focus();
+}
+
 function confirmar(titulo, texto, rotulo, fn) {
   dlgAberto = true;
   const v = el("div", "veu"), d = el("div", "dlg"), fim = () => { v.remove(); d.remove(); dlgAberto = false; };
@@ -914,6 +940,10 @@ function desenhaNav() {
   };
   const logo = el("div", "logo"), longo = el("span", "longo"), curto = el("span", "curto");
   longo.append("dump", el("u", "", "box"), "_"); curto.append("d", el("u", "", "b"), "_"); logo.append(longo, curto);
+  if (window.DUMPBOX_PC) {  // celular conectado: selo com o nome do PC (sem rede, o aviso do topo diz "sem conexão")
+    const s = el("span", "pcok", "PC: " + window.DUMPBOX_PC.replace(/^https?:\/\//, "").split(".")[0]);
+    s.title = "Conectado a " + window.DUMPBOX_PC; logo.append(s);
+  }
   const hoje = [ic("sun"), "Hoje"];
   if (atras) hoje.push(el("span", "chip", `${atras} atrasado${atras > 1 ? "s" : ""}`));
   const lb = el("div", "lb"); lb.append(el("span", "", "PASTAS"), el("span", "", "abertos"));
@@ -924,7 +954,8 @@ function desenhaNav() {
     botao("sair mais", ["⋯ mais"], "Avisos, ajuda, sair", e => { const a = e.currentTarget; popover(a, "Mais", [
       { txt: "Avisos", fn: () => menuAvisos(a) },
       { txt: "Ajuda", fn: () => tutorial() },
-      ...(window.DUMPBOX_LOCAL ? [] : [{ txt: "Cópia p/ celular", fn: () => { location.href = "api/copia"; } }]),
+      ...(window.DUMPBOX_LOCAL ? [] : [{ txt: "Conectar celular", fn: conectarCelular }, { txt: "Cópia p/ celular", fn: () => { location.href = "api/copia"; } }]),
+      ...(window.DUMPBOX_PC ? [{ txt: "Desconectar do PC", fn: () => { localStorage.removeItem("dumpbox.pc"); localStorage.removeItem("dumpbox.token"); location.reload(); } }] : []),
       { txt: "Sair", fn: async () => { await api("/api/logout", {}); mostra("login"); } },
     ]); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,

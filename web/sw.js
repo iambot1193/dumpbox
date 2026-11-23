@@ -1,6 +1,6 @@
 // Casco do app: rede primeiro (revalida por ETag), cache só quando offline. A API nunca é cacheada.
 // caminhos relativos: o mesmo casco serve no PC (/) e no GitHub Pages (/dumpbox/)
-const V = "dumpbox-v28", CASCO = ["./", "app.js", "local.js", "manifest.webmanifest", "icon.svg", "fonts/barlow-500.woff2", "fonts/barlow-700.woff2"];
+const V = "dumpbox-v29", CASCO = ["./", "app.js", "local.js", "manifest.webmanifest", "icon.svg", "fonts/barlow-500.woff2", "fonts/barlow-700.woff2"];
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(V).then(c => c.addAll(CASCO))); });
 self.addEventListener("activate", e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k))))
   .then(() => self.clients.claim())));

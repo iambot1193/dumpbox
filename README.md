@@ -75,6 +75,7 @@ Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a esco
 - Navegador atual: Chrome no Android ou Safari no iPhone.
 - O PC precisa estar ligado com o dumpbox aberto. Sem o PC, o celular só guarda notas novas numa fila e as envia quando o PC voltar.
 - [Tailscale](https://tailscale.com) instalado e logado na mesma conta no PC e no celular, e `tailscale serve --bg 8000` no PC (use a porta mostrada na janela do dumpbox). Isso dá HTTPS, necessário para instalar como app na tela inicial.
+- Atalho: no PC, **⋯ mais → Conectar celular** liga o `tailscale serve` sozinho e mostra um QR. A câmera do celular abre o app já apontando para o PC; só falta a senha. Conectado, a lateral mostra "● PC: <nome>".
 - O `dumpbox.exe` só aceita conexões do próprio PC, então "mesma rede Wi-Fi" sem Tailscale só funciona na instalação para desenvolvedores (`--host 0.0.0.0`).
 
 ## Usar (Windows, sem instalar nada)

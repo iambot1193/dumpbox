@@ -17,7 +17,8 @@ tailscale serve --bg 8000                                # depois de instalar o 
 ```
 
 ### Distribuição: um exe para PC virgem
-- `dumpbox.exe` (PyInstaller, ~14 MB, sem Python) sobe o servidor em 127.0.0.1 e abre o navegador. Dados em `%LOCALAPPDATA%/dumpbox`.
+- `dumpbox.exe` (PyInstaller, ~14 MB, sem Python) sobe o servidor em 127.0.0.1 e abre em janela de app (`msedge --app=`; sem Edge, navegador padrão). Dados em `%LOCALAPPDATA%/dumpbox`.
+- **Conectar celular (`tailnet.py`, `GET /api/endereco`):** lê `tailscale status --json` (nome ts.net), liga `tailscale serve --bg <porta>` se faltar e devolve a URL; sem Tailscale/login/HTTPS devolve o erro com link. A tela mostra QR (`web/qrcode.js`, MIT, carregado só ao abrir) para `<Pages>/?pc=<url>`; `local.js` aceita só `https://*.*.ts.net` (link alheio não pede a senha em servidor estranho). Conectado: selo "● PC: nome" na lateral e "Desconectar do PC" no ⋯ mais.
 - **Assistente de primeiro uso:** sem senha configurada, a tela pede para criar uma. `POST /api/setup` só vale **sem senha existente** e **do próprio PC** (host loopback e nenhum cabeçalho de proxy/túnel), para ninguém assumir o app via Tailscale/Cloudflare.
 - **`ollama_mgr.py`:** usa o Ollama se já estiver rodando; senão acha/baixa o zip portátil (1,6 GB), sobe em segundo plano e puxa o modelo (7B com ≥16 GB de RAM, senão 1.5B). Progresso em `GET /api/estado`; até ficar pronto, o worker deixa as notas `pendentes`.
 - Build local `build.ps1`; CI em `.github/workflows/release.yml` roda os testes, gera o exe e anexa à release de tags `v*`.
@@ -111,7 +112,7 @@ o mais recente vence por campo. Plano completo e roteiro de teste: [plano-sync.m
 
 ## Pendências
 1. Sincronização celular↔PC: [plano-sync.md](plano-sync.md).
-2. Demo clicável no GitHub Pages; "Conectar celular" (QR para o endereço `ts.net`); limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
+2. Demo clicável no GitHub Pages; limite de login por aparelho, não por IP (atrás de proxy tudo chega como 127.0.0.1).
 3. Bot do Telegram para lembretes (sem código ainda; testar contra um Telegram falso).
 4. Qualidade: pasta 91%, texto riscado na foto 76%, efeito da instrução junto com a foto não medido.
 5. Release v1.0 do exe (só na versão final).

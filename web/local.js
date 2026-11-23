@@ -204,7 +204,14 @@
   const fetchRede = window.fetch.bind(window);
   const rota = url => typeof url === "string" && url.match(/\/api\/(.+)$/)?.[1];
   const ler = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  // QR do PC (?pc=https://….ts.net): conecta sozinho. Só endereço do Tailscale, para um link qualquer não pedir a senha num servidor alheio
+  const q = new URLSearchParams(location.search), doQR = q.get("pc");
+  if (doQR && /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.ts\.net\/?$/i.test(doQR)) {
+    try { localStorage.setItem("dumpbox.pc", doQR.replace(/\/+$/, "")); } catch {}
+    q.delete("pc"); history.replaceState(null, "", location.pathname + (q.size ? "?" + q : ""));
+  }
   const PC = ler("dumpbox.pc");
+  window.DUMPBOX_PC = PC;
 
   if (PC) {  // ---- conectado: o PC é o servidor (IA, chat, foto); sem conexão, a fila de notas do app.js guarda ----
     let enviando = false;

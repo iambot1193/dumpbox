@@ -195,9 +195,18 @@ with sync_playwright() as p:
     ok(sorted(i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"]) == antes, "restaurar backup devolve tudo")
     ok(g.locator('[data-alvo="mercado"]').count() == 1, "pastas voltam com o backup")
 
-    # ---- conectar ao PC: endereço pelo aviso do topo, senha do PC, notas locais sobem ----
+    # ---- QR do PC (?pc=): só aceita endereço do Tailscale ----
     g.context.set_offline(False)
-    g.reload()
+    base = g.url.split("?")[0]
+    g.goto(base + "?local=1&pc=https://evil.example.com")
+    g.wait_for_selector("#nav .fold")
+    ok(g.evaluate("localStorage['dumpbox.pc']") is None, "QR com endereço fora do Tailscale é ignorado")
+    g.goto(base + "?local=1&pc=" + "https%3A%2F%2Fmeu-pc.tail12ab.ts.net")
+    ok(g.evaluate("localStorage['dumpbox.pc']") == "https://meu-pc.tail12ab.ts.net" and "pc=" not in g.url, "QR do Tailscale conecta e limpa o link")
+    g.evaluate("localStorage.removeItem('dumpbox.pc')")
+
+    # ---- conectar ao PC: endereço pelo aviso do topo, senha do PC, notas locais sobem ----
+    g.goto(base + "?local=1")
     g.wait_for_selector("#nav .fold")
     g.once("dialog", lambda d: d.accept(PC))
     g.click("#prep")
@@ -219,6 +228,7 @@ with sync_playwright() as p:
     g.reload()
     g.wait_for_selector("#nav .fold")
     ok(g.locator("#app").is_visible(), "continua logado no PC depois de recarregar (token)")
+    ok(g.locator(".pcok").is_visible(), "selo de PC conectado na lateral")
     ok(not erros, f"sem erros no console/rede {erros[:3]}")
     b.close()
 srv.shutdown()

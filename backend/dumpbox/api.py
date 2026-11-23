@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, visao
+from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, tailnet, visao
 from .schema import Tipo
 
 # no exe (PyInstaller) os arquivos da web ficam em sys._MEIPASS
@@ -323,6 +323,12 @@ class NovaPasta(BaseModel):
 
 class ApagaPasta(BaseModel):
     destino: str = Field(min_length=1, max_length=40)  # slug de outra pasta, ou "lixeira"
+
+
+@app.get("/api/endereco", dependencies=[Depends(exige_login)])
+def endereco(request: Request):
+    """QR "Conectar celular" na tela do PC: endereço ts.net deste PC (liga o tailscale serve se faltar)."""
+    return tailnet.endereco(request.url.port or 8000)
 
 
 @app.get("/api/copia", dependencies=[Depends(exige_login)])

@@ -120,6 +120,7 @@ class NovoItem(BaseModel):
     prazo: str | None = Field(default=None, max_length=60)  # texto livre ("sexta 14h"), resolvido por regra
     repete: Literal["", "diario", "semanal", "mensal"] | None = None
     detalhe: str | None = Field(default=None, max_length=2000)  # texto abaixo do título
+    lembrete: int | None = Field(default=None, ge=0, le=10080)  # minutos antes do prazo
 
 
 class Posicao(BaseModel):
@@ -254,10 +255,29 @@ def editar_itens(body: Edicao, c=Depends(conexao)):
     return {"grupo": grupo, "descricao": descricao, "n": n}
 
 
+DIRETOS = ("repete", "detalhe", "lembrete")  # campos que a IA não mexe: não passam por chat.validar
+
+
+def _valor_direto(campo: str, valor: str | None):
+    """Valor a gravar para um campo de DIRETOS (ou prazo "limpar"); ValueError se inválido."""
+    v = (valor or "").strip()
+    if campo == "prazo":  # só chega aqui com "limpar"
+        return None
+    if campo == "repete" and v not in ("", *chat.REPETE):
+        raise ValueError("repete: use diario, semanal ou mensal")
+    if campo == "detalhe" and len(v) > 2000:
+        raise ValueError("texto: até 2000 caracteres")
+    if campo == "lembrete" and v:
+        if not v.isdigit() or int(v) > 10080:
+            raise ValueError("lembrete: minutos antes do prazo, de 0 a 10080")
+        return int(v)
+    return v or None
+
+
 class AltOffline(BaseModel):
     id: str = Field(min_length=8, max_length=64)
     item_id: int
-    campo: Literal["estado", "prazo", "contexto", "prioridade", "titulo", "tipo", "repete", "detalhe", "grade"]
+    campo: Literal["estado", "prazo", "contexto", "prioridade", "titulo", "tipo", "repete", "detalhe", "lembrete", "grade"]
     valor: str | None = None
     quando: datetime
 
@@ -299,11 +319,8 @@ def sincronizar(body: Sync, c=Depends(conexao)):
             res["ignoradas_antigas"] += 1
             continue
         try:
-            if a.campo in ("repete", "detalhe") or (a.campo == "prazo" and a.valor == "limpar"):
-                v = None if a.valor == "limpar" else (a.valor or "").strip() or None
-                if a.campo == "repete" and v not in (None, *chat.REPETE) or len(v or "") > 2000:
-                    raise ValueError("valor inválido")
-                n = chat._mudar(c, a.item_id, a.campo, v, grupo, None)
+            if a.campo in DIRETOS or (a.campo == "prazo" and a.valor == "limpar"):
+                n = chat._mudar(c, a.item_id, a.campo, _valor_direto(a.campo, a.valor), grupo, None)
             else:
                 n = chat.aplicar(c, chat.validar(c, chat.Acao(tipo=a.campo, item_id=a.item_id, valor=a.valor), quando)[0], grupo)
             if n:  # diário com a hora em que foi feito no celular: a próxima comparação usa essa hora
@@ -317,7 +334,7 @@ def sincronizar(body: Sync, c=Depends(conexao)):
 
 
 class EdicaoCard(BaseModel):
-    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete", "detalhe"], str] = Field(min_length=1)
+    mudancas: dict[Literal["titulo", "tipo", "contexto", "prioridade", "prazo", "repete", "detalhe", "lembrete"], str] = Field(min_length=1)
 
 
 @app.post("/api/itens/{item_id}/editar", dependencies=[Depends(exige_login)])
@@ -325,13 +342,13 @@ def editar_card(item_id: int, body: EdicaoCard, c=Depends(conexao)):
     """Botão Editar do card: vários campos de um item, tudo ou nada, um Desfazer.
     repete, detalhe e prazo "limpar" não passam pelo validador da IA (ela não mexe neles)."""
     validas, m = [], body.mudancas
-    diretos = {k: m.pop(k) for k in ("repete", "detalhe") if k in m}
+    diretos = {k: m.pop(k) for k in DIRETOS if k in m}
     if m.get("prazo") == "limpar":
-        m.pop("prazo"); diretos["prazo"] = None
-    if diretos.get("repete") not in (None, "", *chat.REPETE):
-        raise HTTPException(422, "repete: use diario, semanal ou mensal")
-    if len(diretos.get("detalhe") or "") > 2000:
-        raise HTTPException(422, "texto: até 2000 caracteres")
+        diretos["prazo"] = m.pop("prazo")
+    try:
+        diretos = {k: _valor_direto(k, v) for k, v in diretos.items()}
+    except ValueError as e:
+        raise HTTPException(422, str(e))
     for campo, valor in body.mudancas.items():
         try:
             validas.append(chat.validar(c, chat.Acao(tipo=campo, item_id=item_id, valor=valor), datetime.now())[0])
@@ -342,7 +359,7 @@ def editar_card(item_id: int, body: EdicaoCard, c=Depends(conexao)):
         raise HTTPException(404, "item inexistente")
     n = sum(chat.aplicar(c, a, grupo) for a in validas)
     for campo, valor in diretos.items():
-        n += chat._mudar(c, item_id, campo, (valor or "").strip() or None, grupo, None)
+        n += chat._mudar(c, item_id, campo, valor, grupo, None)
     c.commit()
     if not n:
         return {"grupo": None, "descricao": None, "n": 0}
@@ -369,11 +386,11 @@ def criar_item(body: NovoItem, c=Depends(conexao)):
     cid = str(uuid.uuid4())
     db.nova_captura(c, cid, titulo, "manual")
     c.execute("UPDATE captura SET status='ok' WHERE id=?", (cid,))
-    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em,repete,detalhe) "
-                    "VALUES(?,?,?,?,?,?,?,'[]',?,?,?)",
+    iid = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_texto,prazo_em,prioridade,tags,criado_em,repete,detalhe,lembrete) "
+                    "VALUES(?,?,?,?,?,?,?,'[]',?,?,?,?)",
                     (cid, body.tipo, titulo, pasta, texto_prazo or None, prazo_em,
                      body.prioridade or rules.prioridade(prazo_em, titulo, agora), db.agora(), body.repete or None,
-                     (body.detalhe or "").strip() or None)).lastrowid
+                     (body.detalhe or "").strip() or None, body.lembrete)).lastrowid
     c.commit()
     return {"id": iid, "descricao": f"“{titulo}” criado em {db.nome_pasta(pasta)}"}
 

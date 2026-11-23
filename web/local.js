@@ -89,6 +89,7 @@
     if (campo === "prioridade" && !NIVEL[valor]) throw new Erro(422, "criticidade inválida");
     if (campo === "titulo" && !valor.trim()) throw new Erro(422, "título vazio");
     if (campo === "repete") { if (valor && !REP[valor]) throw new Erro(422, "repete: use diario, semanal ou mensal"); return ["repete", valor || null]; }
+    if (campo === "lembrete") { const v = String(valor ?? "").trim(); if (v && !(/^\d+$/.test(v) && +v <= 10080)) throw new Erro(422, "lembrete: minutos antes do prazo"); return ["lembrete", v ? +v : null]; }
     return [campo, campo === "titulo" ? valor.trim().slice(0, 200) : valor];
   }
   function frase(it, col, v) {
@@ -114,7 +115,7 @@
       S.alt.push({ grupo, id: it.id, col, antes: it[col] ?? null, depois: v, descricao: frase(it, col, v), desfeito: false });
       it[col] = v; n++;
       if (col === "estado" && v === "feito" && REP[it.repete]) {  // concluiu tarefa que se repete: cria a próxima (como chat._repetir)
-        const nova = novoItem(it.titulo, { tipo: it.tipo, contexto: it.contexto, prioridade: it.prioridade, prazo_em: proxima(it.prazo_em, it.repete), repete: it.repete });
+        const nova = novoItem(it.titulo, { tipo: it.tipo, contexto: it.contexto, prioridade: it.prioridade, prazo_em: proxima(it.prazo_em, it.repete), repete: it.repete, lembrete: it.lembrete ?? null });
         S.alt.push({ grupo, id: nova.id, col: "estado", antes: "arquivado", depois: "catalogado", descricao: `Próxima “${nova.titulo}” para ${nova.prazo_em.replace("T", " ")}`, desfeito: false });
         S.alt.push({ grupo, id: it.id, col: "repete", antes: it.repete, depois: null, descricao: frase(it, "repete", null), desfeito: false });
         it.repete = null;
@@ -146,7 +147,7 @@
       if (!pasta) throw new Erro(422, "pasta inexistente");
       const p = !txt ? null : /^\d{4}-/.test(txt) ? dataIso(txt) : prazo(txt);
       if (txt && !p) throw new Erro(422, `não entendi a data “${txt}”. Tente “sexta 14h”, “amanhã” ou “dia 20”.`);
-      const it = novoItem(titulo, { tipo: b.tipo, contexto: pasta, prazo_em: p, prioridade: b.prioridade || prioridade(p, titulo), repete: b.repete || null, detalhe: (b.detalhe || "").trim().slice(0, 2000) || null });
+      const it = novoItem(titulo, { tipo: b.tipo, contexto: pasta, prazo_em: p, prioridade: b.prioridade || prioridade(p, titulo), repete: b.repete || null, detalhe: (b.detalhe || "").trim().slice(0, 2000) || null, lembrete: Number.isInteger(b.lembrete) ? b.lembrete : null });
       return { id: it.id, descricao: `“${it.titulo}” criado em ${nomePasta(pasta)}` };
     }],
     ["POST", /^itens\/editar$/, b => {
@@ -227,8 +228,8 @@
         const envia = (rota, corpo) => fetchRede(PC + "/api/" + rota, comToken({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
         try {
           let r = nota ? await envia("capturas", { id: it.captura_id, texto: it.texto, criado_em: it.criado_em })  // intacta: a IA do PC classifica
-            : await envia("itens", { titulo: it.titulo, contexto: nomePasta(it.contexto), tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null });
-          if (r.status === 422 && !nota) r = await envia("itens", { titulo: it.titulo, contexto: "outro", tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null });
+            : await envia("itens", { titulo: it.titulo, contexto: nomePasta(it.contexto), tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null, lembrete: it.lembrete ?? null });
+          if (r.status === 422 && !nota) r = await envia("itens", { titulo: it.titulo, contexto: "outro", tipo: it.tipo, prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete || null, detalhe: it.detalhe || null, lembrete: it.lembrete ?? null });
           if (!r.ok) break;
         } catch { break; }
         S.itens = S.itens.filter(i => i !== it); n++;

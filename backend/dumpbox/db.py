@@ -70,6 +70,9 @@ def conectar() -> sqlite3.Connection:
         if "detalhe" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # texto livre abaixo do título do card
             c.execute("ALTER TABLE item ADD COLUMN detalhe TEXT")
             c.commit()
+        if "lembrete" not in {r["name"] for r in c.execute("PRAGMA table_info(item)")}:  # minutos antes do prazo (null = sem)
+            c.execute("ALTER TABLE item ADD COLUMN lembrete INTEGER")
+            c.commit()
         if not c.execute("SELECT 1 FROM pasta LIMIT 1").fetchone():
             c.executemany("INSERT INTO pasta(slug,nome,descricao,ordem,criado_em) VALUES(?,?,?,?,?)",
                           [(s, n, d, i, agora()) for i, (s, n, d) in enumerate(PADRAO)])

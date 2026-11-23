@@ -438,6 +438,12 @@ def test_sync_offline():
     assert (r["invalidas"], r["aplicadas"]) == (2, 3), r
     assert tuple(conn.execute("SELECT estado, prazo_em FROM item WHERE id=?", (a,)).fetchone()) == ("feito", None)
     assert tuple(conn.execute("SELECT grade_col, grade_lin FROM item WHERE id=?", (b,)).fetchone()) == (2, 3)
+    # lembrete por tarefa (minutos antes do prazo): Editar e fila offline; vazio tira; texto é recusado
+    assert c.post(f"/api/itens/{b}/editar", json={"mudancas": {"lembrete": "30"}}).status_code == 200
+    assert conn.execute("SELECT lembrete FROM item WHERE id=?", (b,)).fetchone()[0] == 30
+    assert c.post(f"/api/itens/{b}/editar", json={"mudancas": {"lembrete": "meia hora"}}).status_code == 422
+    assert sync([alt(10, b, "lembrete", "", datetime.now() + timedelta(seconds=40))], datetime.now() + timedelta(seconds=40))["aplicadas"] == 1
+    assert conn.execute("SELECT lembrete FROM item WHERE id=?", (b,)).fetchone()[0] is None
     # tudo aplicado entra no diário (Desfazer)
     assert conn.execute("SELECT COUNT(*) FROM alteracao WHERE item_id=? AND campo='titulo' AND depois='Sync A do celular'", (a,)).fetchone()[0] == 1
 

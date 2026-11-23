@@ -144,6 +144,7 @@ function txtPrazo(p) {
   return hora ? `${nome}, ${hora}` : nome;
 }
 const REPETE = { diario: "todo dia", semanal: "toda semana", mensal: "todo mês" };
+const LEMBRETES = [["", "sem lembrete"], ["0", "na hora do prazo"], ["15", "15 min antes"], ["30", "30 min antes"], ["60", "1 h antes"], ["1440", "1 dia antes"]];
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const aberto = i => i.estado !== "feito";
 const atrasado = i => aberto(i) && i.prazo_em && dias(i.prazo_em) < 0;
@@ -192,7 +193,7 @@ async function editar(ids, campo, valor) {
 }
 // ---- avisos (toast): preferências deste aparelho ----
 // ponytail: localStorage por aparelho; ir para o servidor se quiser a mesma config em todos
-const CFG_PADRAO = { mudo: false, concluir: true, mudancas: true, tempo: 9, puxar: true };
+const CFG_PADRAO = { mudo: false, concluir: true, mudancas: true, tempo: 9, puxar: true, som: true, diario: "" };
 let CFG = { ...CFG_PADRAO };
 try { Object.assign(CFG, JSON.parse(localStorage.getItem("dumpbox.avisos") || "{}")); } catch {}
 const gravaCfg = () => { try { localStorage.setItem("dumpbox.avisos", JSON.stringify(CFG)); } catch {} };
@@ -234,7 +235,14 @@ function menuAvisos(a) {
     { txt: `Mudanças da IA: ${sim(CFG.mudancas)}`, fn: troca("mudancas") },
     { txt: `Na tela: ${CFG.tempo} s`, fn: () => { CFG.tempo = tempos[(tempos.indexOf(CFG.tempo) + 1) % tempos.length]; gravaCfg(); menuAvisos(a); } },
     { txt: `Puxar p/ fechar: ${sim(CFG.puxar)}`, fn: troca("puxar") },
-    { txt: "Testar aviso", fn: () => toast("Assim aparece um aviso. Puxe para o lado para fechar.") },
+    { txt: `Som nos lembretes: ${sim(CFG.som)}`, fn: troca("som") },
+    { txt: `Lembrete diário: ${CFG.diario || "desligado"}`, fn: () => {
+      const hs = ["", "07:00", "08:00", "09:00", "12:00", "18:00", "21:00"];
+      CFG.diario = hs[(hs.indexOf(CFG.diario) + 1) % hs.length]; gravaCfg();
+      if (CFG.diario && temAvisos && Notification.permission === "default") Notification.requestPermission();
+      menuAvisos(a);
+    } },
+    { txt: "Testar aviso", fn: () => { bipe(); toast("Assim aparece um aviso. Puxe para o lado para fechar."); } },
   ]);
 }
 function fecharMenu() { if (menuAberto) { menuAberto.remove(); menuAberto = null; } }
@@ -504,6 +512,7 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
   const detFinal = () => [det.value.trim(), ...[...lista.children].map(r => [r.children[0].checked, r.children[1].value.trim()]).filter(([, t]) => t).map(([c, t]) => `[${c ? "x" : " "}] ${t}`)]
     .filter(Boolean).join("\n");
   const rep = opcoes(el("select"), [["", "não repete"], ...Object.entries(REPETE)], it?.repete || "");
+  const lem = opcoes(el("select"), LEMBRETES, String(it?.lembrete ?? ""));
   titulo.value = it ? it.titulo || "" : tituloIni || "";
   const erro = el("p", "erro"), pe = el("div"), no = el("button", "no", "Cancelar"), si = el("button", "si ok", it ? "Salvar" : "Criar");
   no.type = "button"; no.onclick = fim; v.onclick = fim;
@@ -512,8 +521,8 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
     e.preventDefault(); si.disabled = true;
     try {
       if (it) {
-        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazoFinal(), repete: rep.value, detalhe: detFinal() };
-        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete, detalhe: it.detalhe };
+        const m = { titulo: titulo.value, tipo: tipo.value, contexto: pastaS.value, prioridade: crit.value, prazo: prazoFinal(), repete: rep.value, detalhe: detFinal(), lembrete: lem.value };
+        const antes = { titulo: it.titulo, tipo: it.tipo, contexto: pasta(it), prioridade: it.prioridade, prazo: it.prazo_em, repete: it.repete, detalhe: it.detalhe, lembrete: String(it.lembrete ?? "") };
         for (const k in m) if (m[k] === (antes[k] || "")) delete m[k];
         if (m.prazo === "") m.prazo = "limpar";  // tinha prazo e o dia foi apagado
         if (Object.keys(m).length) {
@@ -522,7 +531,7 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
         }
         fim(); ultimo = ""; return atualizar();
       }
-      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: detFinal() || null });
+      const r = await api("/api/itens", { titulo: titulo.value, contexto: pastaS.value, tipo: tipo.value, prioridade: crit.value || null, prazo: prazoFinal() || null, repete: rep.value || null, detalhe: detFinal() || null, lembrete: lem.value === "" ? null : +lem.value });
       fim(); toast(r.descricao); sinal("criar"); ultimo = ""; atualizar();
     } catch (x) { si.disabled = false; erro.textContent = typeof x.detail === "string" ? x.detail : `Não consegui ${it ? "salvar" : "criar"}. O PC está ligado?`; }
   };
@@ -533,8 +542,9 @@ function novaTarefa(it, tituloIni) {  // com it: edita o card (só manda o que m
   semPrazo.onclick = () => { dia.value = hora.value = prazo.value = ""; semPrazo.hidden = true; };
   semPrazo.hidden = !it?.prazo_em;
   dia.addEventListener("input", () => { semPrazo.hidden = !dia.value && !prazo.value.trim(); });
+  const linha5 = el("div", "duas"); linha5.append(campo("Repetir (ao concluir, cria a próxima)", rep), campo("Lembrete", lem));
   pe.append(no, si);
-  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), ckl, linha2, linha3, semPrazo, linha4, campo("Repetir (ao concluir, cria a próxima)", rep), erro, pe);
+  f.append(el("h4", "", it ? "Editar" : "Nova tarefa"), campo("Título", titulo), campo("Texto", det), ckl, linha2, linha3, semPrazo, linha4, linha5, erro, pe);
   document.body.append(v, f); titulo.focus();
 }
 // ---- formulário genérico (nova pasta, apagar pasta) ----
@@ -867,6 +877,7 @@ function cartao(it, comPasta) {
     const d = el("div", "due"); d.append(ic("clock"), txtPrazo(it.prazo_em)); a.append(d);
   }
   if (REPETE[it.repete]) { const d = el("div", "due"); d.append(ic("retry"), REPETE[it.repete]); a.append(d); }
+  if (it.prazo_em && it.lembrete != null) a.append(el("div", "due", "🔔 " + (LEMBRETES.find(([v]) => v === String(it.lembrete))?.[1] || `${it.lembrete} min antes`)));
   const acts = el("div", "acts"), dir = el("div");
   const feito = aberto(it);
   dir.append(botao("cp", [ic("copy")], "Copiar", () => copiar(it.id)), botao("ed", [ic("edit")], "Editar", () => novaTarefa(it)),botao("mv", [ic("move")], "Mover para…", e => menuMover(e.currentTarget, it.id)),
@@ -1073,13 +1084,47 @@ async function avisarVencidos() {
   if (!novos.length) return;
   const agora = Object.fromEntries(D.itens.filter(vencido).map(i => [i.id, i.prazo_em]));
   try { localStorage.setItem(AVISADOS, JSON.stringify(agora)); } catch { return; }  // sem guardar, avisaria a cada 5 s
-  const titulo = novos.length === 1 ? "Tarefa vencida" : `${novos.length} tarefas vencidas`;
-  const corpo = novos.slice(0, 4).map(i => `• ${i.titulo} (${txtPrazo(i.prazo_em)})`).join("\n") + (novos.length > 4 ? `\n… e mais ${novos.length - 4}` : "");
+  notificar(novos.length === 1 ? "Tarefa vencida" : `${novos.length} tarefas vencidas`, listaAviso(novos), "dumpbox-vencidas");
+}
+const listaAviso = its => its.slice(0, 4).map(i => `• ${i.titulo} (${txtPrazo(i.prazo_em)})`).join("\n") + (its.length > 4 ? `\n… e mais ${its.length - 4}` : "");
+async function notificar(titulo, corpo, tag) {  // sem permissão de notificação: aviso na tela (só com o app aberto)
+  bipe();
+  if (!temAvisos || Notification.permission !== "granted") return toast(`${titulo}: ${corpo.replace(/\n/g, " ")}`);
   try {
     const reg = await navigator.serviceWorker?.getRegistration();  // Android só mostra pelo service worker
-    if (reg) return await reg.showNotification(titulo, { body: corpo, tag: "dumpbox-vencidas", icon: "icon.svg" });
+    if (reg) return await reg.showNotification(titulo, { body: corpo, tag, icon: "icon.svg" });
   } catch {}
-  try { new Notification(titulo, { body: corpo, tag: "dumpbox-vencidas" }); } catch {}
+  try { new Notification(titulo, { body: corpo, tag }); } catch {}
+}
+let audio;
+function bipe() {  // som gerado na hora, sem arquivo; o navegador só toca depois de algum toque na página
+  if (!CFG.som) return;
+  try {
+    audio ||= new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+    o.frequency.value = 880; g.gain.setValueAtTime(.2, t); g.gain.exponentialRampToValueAtTime(.001, t + .35);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + .35);
+  } catch {}
+}
+// lembrete por tarefa (X min antes do prazo) e lembrete diário (lista do dia num horário). Mesmo limite dos vencidos:
+// ponytail: só com o app aberto ou em 2º plano; app fechado precisa de Web Push ou do Telegram
+const LEMBRADOS = "dumpbox.lembrados";
+const alvoLembrete = i => new Date(new Date(i.prazo_em.length > 10 ? i.prazo_em : i.prazo_em + "T09:00") - i.lembrete * 6e4);  // só dia = 9h
+function lembrar() {
+  let ja = {}; try { ja = JSON.parse(localStorage.getItem(LEMBRADOS) || "{}"); } catch {}
+  const agora = new Date(), hoje = horaLocal().slice(0, 10), chave = i => `${i.prazo_em}|${i.lembrete}`;
+  const hora = D.itens.filter(i => aberto(i) && i.prazo_em && i.lembrete != null && ja[i.id] !== chave(i)
+    && alvoLembrete(i) <= agora && agora - alvoLembrete(i) < 12 * 36e5);  // muito atrasado: o aviso de vencida já cobre
+  const diario = CFG.diario && horaLocal().slice(11, 16) >= CFG.diario && ja.diario !== hoje;
+  if (!hora.length && !diario) return;
+  hora.forEach(i => { ja[i.id] = chave(i); });
+  if (diario) ja.diario = hoje;
+  try { localStorage.setItem(LEMBRADOS, JSON.stringify(ja)); } catch { return; }  // sem guardar, repetiria a cada 5 s
+  if (hora.length) notificar(hora.length === 1 ? `Lembrete: ${hora[0].titulo}` : `${hora.length} lembretes`, listaAviso(hora), "dumpbox-lembrete");
+  if (diario) {
+    const hj = D.itens.filter(i => aberto(i) && i.prazo_em && dias(i.prazo_em) <= 0);
+    notificar(hj.length ? `Hoje: ${hj.length} com prazo` : "Hoje: nada com prazo", hj.length ? listaAviso(hj) : "Dia livre no dumpbox.", "dumpbox-diario");
+  }
 }
 
 // ---- tutorial guiado: abre sozinho no 1º acesso (depois pelo "ajuda"); destaca a parte da tela e espera você fazer ----
@@ -1230,7 +1275,7 @@ async function iniciar() {
   if (!visto) tutorial();
 }
 window.addEventListener("online", () => { enviarFila().then(atualizar); });
-setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); } }, 5000);
+setInterval(() => { if (!$("app").hidden) { enviarFila(); atualizar(); lembrar(); } }, 5000);  // lembrar fora do atualizar: vale sem o PC
 setInterval(() => { if (!$("prep").hidden) estado(); }, 3000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 iniciar();

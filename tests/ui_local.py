@@ -13,7 +13,7 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -194,6 +194,19 @@ with sync_playwright() as p:
     g.wait_for_selector("#toast >> text=Backup restaurado")
     ok(sorted(i["titulo"] for i in g.evaluate(api, ["/api/itens", None])[1]["itens"]) == antes, "restaurar backup devolve tudo")
     ok(g.locator('[data-alvo="mercado"]').count() == 1, "pastas voltam com o backup")
+
+    # ---- lembretes: por tarefa (X min antes do prazo) e diário; sem permissão de notificação viram aviso na tela ----
+    g.context.set_offline(False)
+    daqui = (datetime.now() + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M")
+    st, r = g.evaluate(api, ["/api/itens", {"titulo": "Ligar pro dentista", "contexto": "casa", "tipo": "tarefa", "prazo": daqui, "lembrete": 15}])
+    ok(st == 200, f"cria tarefa com lembrete {st} {r}")
+    g.wait_for_selector("#toast >> text=Lembrete: Ligar pro dentista", timeout=12000)
+    ok(True, "lembrete 15 min antes dispara (prazo daqui a 10 min)")
+    g.evaluate("localStorage.setItem('dumpbox.avisos', JSON.stringify({diario: '00:00'}))")
+    g.reload(); g.wait_for_selector("#nav .fold")
+    g.wait_for_selector("#toast >> text=Hoje:", timeout=12000)
+    ok("Lembrete: Ligar" not in g.locator("#toast").inner_text(), "lembrete diário aparece 1x e o da tarefa não repete")
+    g.evaluate("localStorage.removeItem('dumpbox.avisos')")
 
     # ---- QR do PC (?pc=): só aceita endereço do Tailscale ----
     g.context.set_offline(False)

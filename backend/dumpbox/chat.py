@@ -23,7 +23,7 @@ from .schema import Tipo
 Prioridade = Literal["critica", "alta", "media", "baixa"]
 _DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 _COLUNA = {"estado": "estado", "prazo": "prazo_em", "contexto": "contexto", "prioridade": "prioridade",
-           "titulo": "titulo", "tipo": "tipo", "repete": "repete", "detalhe": "detalhe"}  # whitelist: nome de coluna nunca vem do modelo
+           "titulo": "titulo", "tipo": "tipo", "repete": "repete", "detalhe": "detalhe", "lembrete": "lembrete"}  # whitelist: nome de coluna nunca vem do modelo
 REPETE = {"diario": "todo dia", "semanal": "toda semana", "mensal": "todo mês"}
 _NIVEL = {"critica": "crítica", "alta": "alta", "media": "média", "baixa": "baixa"}
 _EXCLUIR = {"excluido", "excluído", "apagado", "deletado", "removido", "excluir", "apagar"}  # viram "arquivado"
@@ -186,6 +186,8 @@ def _frase(campo: str, titulo: str, antes: str | None, depois: str) -> str:
         return f"“{titulo}” " + (f"repete {REPETE[depois]}" if depois else "não repete mais")
     if campo == "detalhe":
         return f"Texto de “{titulo}” " + ("editado" if depois else "apagado")
+    if campo == "lembrete":
+        return f"“{titulo}” " + (f"avisa {depois} min antes" if depois else "avisa na hora" if depois == 0 else "sem lembrete")
     if campo == "prazo" and not depois:
         return f"“{titulo}” ficou sem prazo"
     return f"{campo} de “{titulo}”: {antes or '-'} → {depois}"
@@ -250,10 +252,10 @@ def _repetir(c, item_id: int, grupo: str) -> None:
     if not it["repete"] or it["repete"] not in REPETE:
         return
     prazo = proxima(it["prazo_em"], it["repete"], datetime.now())
-    novo = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_em,prioridade,tags,estado,criado_em,repete) "
-                     "VALUES(?,?,?,?,?,?,?,'catalogado',?,?)",
+    novo = c.execute("INSERT INTO item(captura_id,tipo,titulo,contexto,prazo_em,prioridade,tags,estado,criado_em,repete,lembrete) "
+                     "VALUES(?,?,?,?,?,?,?,'catalogado',?,?,?)",
                      (it["captura_id"], it["tipo"], it["titulo"], it["contexto"], prazo, it["prioridade"], it["tags"] or "[]",
-                      db.agora(), it["repete"])).lastrowid
+                      db.agora(), it["repete"], it["lembrete"])).lastrowid
     c.execute("INSERT INTO alteracao(grupo,item_id,campo,antes,depois,descricao,criado_em) VALUES(?,?,'estado','arquivado','catalogado',?,?)",
               (grupo, novo, f"Próxima “{it['titulo']}” para {prazo.replace('T', ' ')}", db.agora()))
     _mudar(c, item_id, "repete", None, grupo, None)

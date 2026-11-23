@@ -248,6 +248,11 @@ with sync_playwright() as p:
     loc = g.evaluate("JSON.parse(localStorage['dumpbox.local']).itens")
     ok(do_pc and any(i["titulo"] == "Pagar boleto" for i in loc) and not g.evaluate("localStorage['dumpbox.pc']"),
        "desconectar leva a cópia do PC para o aparelho (cards não somem)")
+    antes = g.evaluate("localStorage['dumpbox.local']")
+    g.goto(URL + "&demo=1")
+    g.wait_for_selector("#nav .fold")
+    g.wait_for_timeout(800)
+    ok(g.evaluate("JSON.parse(localStorage['dumpbox.demo']).itens.length") == 7 and g.evaluate("localStorage['dumpbox.local']") == antes, "demo mostra exemplos sem tocar nos seus dados")
     ok(not erros, f"sem erros no console/rede {erros[:3]}")
     b.close()
 srv.shutdown()

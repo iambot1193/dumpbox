@@ -6,19 +6,34 @@
   const LOCAL = location.hostname.endsWith("github.io") || new URLSearchParams(location.search).has("local");
   if (!LOCAL) return;
   window.DUMPBOX_LOCAL = true;
-  const K = "dumpbox.local";
+  const DEMO = new URLSearchParams(location.search).has("demo");  // ?demo=1: dados de exemplo em chave própria, nunca mexe nos seus
+  const K = DEMO ? "dumpbox.demo" : "dumpbox.local";
   const PADRAO = [["casa", "Casa"], ["trabalho", "Trabalho"], ["freelance", "Freelance"], ["estudos", "Estudos"], ["saude", "Saúde"], ["financas", "Finanças"], ["outro", "Outro"]];
   const NIVEL = { critica: "crítica", alta: "alta", media: "média", baixa: "baixa" };
   let S;
   try { S = JSON.parse(localStorage.getItem(K)); } catch {}
   S ||= { seq: 1, itens: [], alt: [], pastas: PADRAO.map(([slug, nome]) => ({ slug, nome, descricao: "" })) };
+  if (DEMO && !S.itens.length) {
+    const d = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), agora = new Date().toISOString().slice(0, 19);
+    S.itens = [
+      ["tarefa", "Pagar boleto da internet", "financas", d(0), "critica", "código de barras no e-mail"],
+      ["tarefa", "Entregar landing page do cliente", "freelance", d(2), "alta", "[x] layout\n[x] textos\n[ ] formulário de contato"],
+      ["tarefa", "Revisar matéria da prova", "estudos", d(5), "media", null],
+      ["compra", "Comprar pilhas AA", "casa", null, "baixa", null],
+      ["tarefa", "Marcar dentista", "saude", d(-1), "alta", null],
+      ["ideia", "App que separa notas soltas por pasta sozinho", "trabalho", null, "baixa", null],
+      ["tarefa", "Passar pano na sala", "casa", d(1), "media", null],
+    ].map(([tipo, titulo, contexto, prazo_em, prioridade, detalhe], k) => ({ id: k + 1, tipo, titulo, contexto, prazo_em, prioridade,
+      estado: "catalogado", criado_em: agora, detalhe, repete: null, grade_col: null, grade_lin: null, grade_larg: null, grade_alt: null }));
+    S.seq = S.itens.length + 1;
+  }
   const salvar = () => localStorage.setItem(K, JSON.stringify(S));  // cheio: lança, a tela mostra "não consegui salvar"
   try { salvar(); } catch {}  // 1º uso: grava o estado inicial (o desfazer de erro relê daqui)
   // sem isto o navegador pode apagar o localStorage sozinho (falta de espaço; Safari após 7 dias sem abrir o site)
   navigator.storage?.persist?.().catch(() => {});
   const BK = K + ".backup_em";
   const semBackup = () => {  // texto do alerta, ou "" quando o backup está em dia (ou não há o que perder)
-    if (!S.itens.some(i => i.origem !== "pc")) return "";
+    if (DEMO || !S.itens.some(i => i.origem !== "pc")) return "";
     let t = 0; try { t = +localStorage.getItem(BK) || 0; } catch {}
     const dias = Math.floor((Date.now() - t) / 864e5);
     return !t ? "você ainda não fez backup" : dias >= 7 ? `o último backup foi há ${dias} dias` : "";
@@ -211,7 +226,7 @@
     try { localStorage.setItem("dumpbox.pc", doQR.replace(/\/+$/, "")); } catch {}
     q.delete("pc"); history.replaceState(null, "", location.pathname + (q.size ? "?" + q : ""));
   }
-  const PC = ler("dumpbox.pc");
+  const PC = DEMO ? null : ler("dumpbox.pc");
   window.DUMPBOX_PC = PC;
 
   if (PC) {  // ---- conectado: o PC é o servidor (IA, chat, foto); sem conexão, a fila de notas do app.js guarda ----

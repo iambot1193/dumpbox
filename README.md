@@ -38,7 +38,7 @@ flowchart LR
 | ![Vista Hoje](docs/img/hoje.png) | ![Assistente aplicando mudança](docs/img/ia.png) | ![Tela no celular](docs/img/celular.png) |
 
 - **Tudo roda no seu PC** (Ollama + FastAPI + SQLite). O celular só abre a PWA, com login próprio.
-- **Offline-first no navegador:** notas ficam numa fila local com UUID e são enviadas quando o servidor volta (idempotente).
+- **Offline-first no navegador:** notas ficam numa fila local com UUID e são enviadas quando o servidor volta (idempotente). Sem o PC, o app mostra a última cópia dos cards e guarda as edições numa fila; ao voltar, `POST /api/sync` aplica **por campo, o mais recente vence** (id repetido ignorado, relógio do celular corrigido).
 - **Nunca perde nota:** se a IA falha, a captura fica em "Revisar" com o texto original.
 - **A IA não calcula datas.** O modelo copia o trecho (`prazo_texto`); um parser determinístico em pt-BR resolve a data e a prioridade.
 - Saída do modelo forçada por JSON Schema (gerado do Pydantic, com o enum das pastas que existem no momento).
@@ -56,6 +56,8 @@ flowchart LR
 - **Criticidade** em 4 níveis (crítica, alta, média, baixa) e filtro por nível. A regra sugere pelo prazo; o que você marca à mão não é recalculado.
 - **Seleção múltipla:** clique, Ctrl+clique, Shift+clique, Shift+arrastar por cima dos cards, laço arrastando no vazio, Ctrl+A; ações em lote com um Desfazer. No celular, botão "Selecionar".
 - **Foto ou print de lista** (botão de câmera ou Ctrl+V): fica anexada como miniatura para você escrever instruções; linhas marcadas fecham itens que já existem, o resto vira item.
+- **Lembretes:** por tarefa (na hora, 15/30 min, 1 h ou 1 dia antes do prazo), lembrete diário num horário com a lista do dia e bipe; avisa com o app aberto ou em 2º plano.
+- **Conectar celular por QR:** ⋯ mais → Conectar celular liga o `tailscale serve` e mostra o QR; no celular só falta a senha.
 - **+ Nova** cria tarefa à mão, sem IA. **Janela flutuante da IA** para perguntar e pedir mudanças (aplica na hora, com Desfazer; nunca apaga de vez).
 
 Os mockups que guiaram a tela estão em [`docs/mockups/`](docs/mockups/) (a escolhida foi a B2).

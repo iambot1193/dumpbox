@@ -56,6 +56,8 @@ Você recebe a lista de itens (um por linha: #id | título | tipo | contexto | p
   quando o usuário pedir o tipo ("quais tarefas?"). Nunca responda "não há notas" se a lista tem itens.
 - Tamanho ("mais extensa", "maior", "mais longa"): use o campo palavras e a linha "Mais longos", nunca estime.
 - Perguntas ("o que tenho pra sexta?", "quais compras?"): responda usando só a lista, citando os itens. Não invente itens.
+- Quando: use as linhas "Atrasados", "Prazo hoje", "Prazo amanhã" e "Próximos 7 dias" e o rótulo entre parênteses do prazo; nunca recalcule datas.
+- "passa/muda/adia/joga X pra sexta" = mudança de prazo: acao prazo / id de X / "sexta".
 - Pedidos de mudança: devolva em "acoes" e explique em "resposta" (o servidor aplica e o usuário pode desfazer).
 {AJUDA_ACOES}
 Use somente ids que existem na lista. Sem pedido de mudança, acoes = [].
@@ -84,7 +86,7 @@ def duplicados(c) -> list[int]:
 
 def contexto_itens(c, limite: int = 60, detalhado: bool = False) -> str:
     rows = c.execute(
-        "SELECT id,titulo,tipo,contexto,prazo_em,prioridade,estado,criado_em FROM item WHERE estado!='arquivado' "
+        "SELECT id,titulo,tipo,contexto,prazo_em,prioridade,estado,criado_em,detalhe FROM item WHERE estado!='arquivado' "
         "ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
 
     def prazo(p):  # modelo de 7B erra datas ISO: damos dia da semana e distância já calculados
@@ -101,15 +103,22 @@ def contexto_itens(c, limite: int = 60, detalhado: bool = False) -> str:
         extra = f" | criado={r['criado_em']}" + (" | REPETIDO (há um mais novo igual)" if r["id"] in repetidos else "") if detalhado else ""
         lin.append(f"#{r['id']} | {str(r['titulo']).replace(chr(10), ' ')} | {r['tipo']} | {r['contexto']} | "
                    f"prazo={prazo(r['prazo_em'])} | {r['prioridade']} | {r['estado']}"
-                   + (f" | palavras={_palavras(r['titulo'])}" if detalhado else "") + extra)
+                   + (f" | palavras={_palavras(r)}" if detalhado else "") + extra)
     if detalhado and rows:  # modelo de 7B não conta palavras nem compara 60 números: ranking já calculado
-        top = sorted(rows, key=lambda r: -_palavras(r["titulo"]))[:3]
-        lin.append("Mais longos (palavras): " + ", ".join(f"#{r['id']} ({_palavras(r['titulo'])})" for r in top))
+        top = sorted(rows, key=lambda r: -_palavras(r))[:3]
+        lin.append("Mais longos (palavras): " + ", ".join(f"#{r['id']} ({_palavras(r)})" for r in top))
+        hoje = datetime.now().date()  # idem para datas: "o que tenho hoje/amanhã" sai destas listas
+        for nome, cond in (("Atrasados", lambda n: n < 0), ("Prazo hoje", lambda n: n == 0), ("Prazo amanhã", lambda n: n == 1),
+                           ("Próximos 7 dias", lambda n: 1 < n <= 7)):
+            ids = [f"#{r['id']} {r['titulo']}" for r in rows if r["prazo_em"] and r["estado"] == "catalogado"
+                   and cond((datetime.fromisoformat(r["prazo_em"]).date() - hoje).days)]
+            lin.append(f"{nome}: " + ("; ".join(ids) if ids else "nenhum"))
     return "\n".join(lin) or "(nenhum item)"
 
 
-def _palavras(t) -> int:
-    return len(str(t or "").split())
+def _palavras(r) -> int:
+    """Título + detalhe do card (o usuário vê os dois como "a nota")."""
+    return len(f"{r['titulo'] or ''} {r['detalhe'] or ''}".split())
 
 
 def _ollama(mensagens: list[dict]) -> str:

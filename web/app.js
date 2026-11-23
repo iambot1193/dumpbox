@@ -843,8 +843,10 @@ function vPasta(v) {
   const ft = el("div", "ft");
   ft.append(botao(filtro ? "" : "on", ["Todas"], null, () => { filtro = null; render(); }));
   for (const [val, n] of NIVEIS) ft.append(botao(filtro === val ? "on" : "", [n], null, () => { filtro = val; render(); }));
-  v.append(cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoRapida(), botaoColar(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length),
-    ...(vista === "outro" ? [] : [botao("perigo", ["Apagar pasta"], "Apagar esta pasta (os itens vão para outra)", () => apagarPasta(vista))])));
+  const hd = cabecalho(NOME[vista], `${abertos.length} aberto${abertos.length === 1 ? "" : "s"}${crit ? ` · ${crit} crítica${crit === 1 ? "" : "s"}` : ""} · ${altas} alta${altas === 1 ? "" : "s"}`, botaoNova(), botaoRapida(), botaoColar(), botaoSel(), ft, chaveFeitos(todos.length - abertos.length));
+  // "Apagar pasta" vai junto do título (não empurra a barra de botões para outra linha)
+  if (vista !== "outro") hd.querySelector("h2 + span").after(botao("perigo", ["Apagar pasta"], "Apagar esta pasta (os itens vão para outra)", () => apagarPasta(vista)));
+  v.append(hd);
   if (!lista.length) { v.append(el("p", "vazio", filtro ? "Nada com essa criticidade." : "Pasta vazia.")); gradeAtual = null; return; }
   gradeAtual = lista;
   const pos = arranjar(lista), g = el("div", "grid");
@@ -919,10 +921,12 @@ function desenhaNav() {
   fim.append(linha("revisar", [ic("alert"), "Revisar"], D.revisar.filter(c => c.status === "falhou").length),
     linha("lixeira", [ic("trash"), "Lixeira"], D.lixeira.length, true),
     ...(temAvisos && Notification.permission === "default" ? [botao("sair", ["ligar avisos"], "Notificar quando uma tarefa passar do prazo", ativarAvisos)] : []),
-    botao("sair", ["avisos"], "Configurar os avisos da tela", e => menuAvisos(e.currentTarget)),
-    botao("sair", ["ajuda"], "Ver o tutorial de novo", () => tutorial()),
-    ...(window.DUMPBOX_LOCAL ? [] : [botao("sair", ["cópia p/ celular"], "Baixar cópia para importar no app do celular", () => { location.href = "api/copia"; })]),
-    botao("sair", ["sair"], null, async () => { await api("/api/logout", {}); mostra("login"); }));
+    botao("sair mais", ["⋯ mais"], "Avisos, ajuda, sair", e => { const a = e.currentTarget; popover(a, "Mais", [
+      { txt: "Avisos", fn: () => menuAvisos(a) },
+      { txt: "Ajuda", fn: () => tutorial() },
+      ...(window.DUMPBOX_LOCAL ? [] : [{ txt: "Cópia p/ celular", fn: () => { location.href = "api/copia"; } }]),
+      { txt: "Sair", fn: async () => { await api("/api/logout", {}); mostra("login"); } },
+    ]); }));
   $("nav").replaceChildren(logo, linha("hoje", hoje, base.length), lb,
     ...PASTAS.map(([p, n]) => linha(p, [n], abertos.filter(i => pasta(i) === p).length, true)),
     botao("fold mais", [el("span", "nm", "+"), el("span", "rot", "Nova pasta")], "Criar pasta", novaPasta), fim);

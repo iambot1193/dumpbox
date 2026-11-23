@@ -420,7 +420,7 @@ try:
         ok(g.evaluate("document.documentElement.scrollWidth<=innerWidth"), "sem rolagem horizontal no PC")
         # cópia para o celular pela tela do PC; ditado e busca
         with g.expect_download() as dl:
-            g.click("#nav button:has-text('cópia p/ celular')")
+            g.click("#nav button:has-text('mais')"); g.click(".menu button:has-text('Cópia p/ celular')")
         ok(dl.value.suggested_filename.startswith("copia-celular-") and json.loads(Path(dl.value.path()).read_text(encoding="utf-8"))["dumpbox"] == 1,
            "botão baixa a cópia para o celular")
         ok(g.locator("#voz").is_visible(), "botão de ditado (Chrome tem reconhecimento de voz)")
@@ -599,8 +599,9 @@ try:
             toque("touchMove", [{"x": xa + 25 * i, "y": ya}]); time.sleep(.02)
         toque("touchEnd", [])
         ok(m.locator("#toast").is_hidden(), "puxar o aviso para o lado fecha")
-        m.locator("#nav button:text-is('ajuda')").scroll_into_view_if_needed(); time.sleep(1)  # toque com a lateral ainda rolando perde o clique
-        m.locator("#nav button:text-is('avisos')").tap(); time.sleep(.3)
+        m.locator("#nav button.mais.sair").scroll_into_view_if_needed(); time.sleep(1)  # toque com a lateral ainda rolando perde o clique
+        m.locator("#nav button.mais.sair").tap(); time.sleep(.3)
+        m.locator(".menu button", has_text="Avisos").tap(); time.sleep(.3)
         m.locator(".menu button", has_text="Ao concluir").tap()
         ok("Ao concluir: não" in m.inner_text(".menu"), "menu de avisos troca a opção e continua aberto")
         m.keyboard.press("Escape")

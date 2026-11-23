@@ -71,7 +71,7 @@ with sync_playwright() as p:
     g.locator(".tour button", has_text="Fechar").click()
     g.reload(); g.wait_for_selector("#nav .fold"); time.sleep(.5)
     ok(g.locator(".tour").count() == 0, "tutorial não volta depois de visto")
-    g.locator("#nav button", has_text="ajuda").click()
+    g.locator("#nav button", has_text="mais").click(); g.locator(".menu button", has_text="Ajuda").click()
     ok(g.locator(".tour").count() == 1, "“ajuda” reabre o tutorial")
     # interativo: fazer na tela avança o passo (e a tela continua usável com o tutorial aberto)
     g.locator(".tour button", has_text="Pular passo").click()

@@ -126,7 +126,7 @@
 
   const R = [  // [método, regex, função(corpo, ...grupos)]
     ["GET", /^estado$/, () => ({ configurado: true, preparo: { pronto: false, erro: null },
-      aviso: semBackup() ? `⚠ Modo celular: seus dados só existem neste aparelho e ${semBackup()}. Toque aqui e salve um backup.`
+      aviso: semBackup() ? `⚠ Dados só neste aparelho e ${semBackup()}. Toque para salvar.`
         : "Modo celular: notas só neste aparelho, sem IA. Toque aqui para backup, copiar do PC ou conectar." })],
     ["POST", /^(login|logout|setup)$/, () => ({ ok: true })],
     ["GET", /^sessao$/, () => ({ ok: true })],

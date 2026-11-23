@@ -13,7 +13,7 @@ from typing import get_args
 
 from .schema import Contexto, Item, SaidaIA
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")  # "localhost" no Windows tenta IPv6 antes: +2 s por chamada
 PROMPT_V = os.getenv("DUMPBOX_PROMPT", "v2")
 _V1 = (
     "Você cataloga anotações soltas em português. Separe em itens independentes. "

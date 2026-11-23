@@ -139,7 +139,23 @@ def test_whatsapp():
     assert enviados[-1]["to"] == "5511900000001" and enviados[-1]["text"]["body"] == "anotado ✓"
 
 
+def test_busca_sem_modelo():
+    """Sem o modelo de embedding (Ollama fora), a busca do chat cai para palavras e o contexto ainda traz nota antiga."""
+    from dumpbox import busca
+    def fora(*a, **k):
+        raise httpx.ConnectError("sem ollama")
+    busca.embed = fora
+    c = db.conectar()
+    alvo = _item(c, "Renovar seguro do carro", cap="seg")
+    c.execute("UPDATE item SET detalhe='cotar 3 corretoras' WHERE id=?", (alvo,)); c.commit()
+    for k in range(70):  # empurra o alvo para fora dos últimos 60
+        _item(c, f"Item de enchimento {k}", cap=f"e{k}")
+    assert busca.buscar(c, "o que anotei sobre corretoras?")[:1] == [alvo]
+    assert f"#{alvo} |" in chat.contexto_itens(c, detalhado=True, extras=[alvo])
+    assert f"#{alvo} |" not in chat.contexto_itens(c, detalhado=True)
+
+
 if __name__ == "__main__":
-    for t in (test_tratar, test_lembretes, test_telegram_polling, test_whatsapp):
+    for t in (test_tratar, test_lembretes, test_telegram_polling, test_whatsapp, test_busca_sem_modelo):
         t()
         print("ok", t.__name__)

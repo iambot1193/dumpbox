@@ -124,6 +124,8 @@ def preparar() -> None:
         ESTADO["pronto"] = True
         from .visao import MODELO as VISAO
         _garantir_modelo(VISAO, progresso=False)  # depois do texto e sem barra: só fotos esperam por ele
+        from .busca import MODELO as EMBED
+        _garantir_modelo(EMBED, progresso=False)  # ~560 MB; sem ele a busca do chat usa só palavras
     except Exception as e:  # mostra na UI em vez de morrer calado
         ESTADO["erro"] = str(e)[:300]
 

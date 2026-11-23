@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import auth, chat, classifier, db, editor, exportar, ollama_mgr, rules, setup, tailnet, visao
-from . import lembretes
+from . import busca, lembretes
 from .canais import telegram, whatsapp
 from .schema import Tipo
 
@@ -72,6 +72,12 @@ def _worker(parar: threading.Event) -> None:
         try:
             db.backup_diario(c)  # no máximo 1 por dia; barato quando já existe
             _lembrar(c, estado)
+            if ollama_mgr.pronto() and time.monotonic() - estado.get("idx", -99) >= 30:
+                estado["idx"] = time.monotonic()
+                try:
+                    busca.indexar(c)  # vetores para o chat achar nota antiga; sem modelo de embedding, segue sem
+                except Exception:
+                    pass
             if not ollama_mgr.pronto() or not processar_pendentes(c):  # IA ainda preparando: notas ficam pendentes
                 parar.wait(2)
         except Exception:  # worker nunca morre; erro de uma nota não derruba as outras

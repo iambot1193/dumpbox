@@ -1,7 +1,7 @@
 # Extras: Telegram, WhatsApp e "perguntar às notas"
 
 Plano de três extensões do dumpbox. Cada arquivo é o projeto de uma fase, com o que entra, onde mexe no código, como testar
-e o que fica de fora. **Status:** 1 (Telegram) e 2 (WhatsApp, testado sem conta real) implementados; 3 em andamento.
+e o que fica de fora. **Status:** 1 (Telegram) e 2 (WhatsApp, testado sem conta real) implementados; 3 com a busca (RAG) e a avaliação feitas; ferramentas e memória em tabela ficaram para depois.
 
 | # | Extra | Arquivo | Esforço | Depende de |
 |---|-------|---------|---------|------------|

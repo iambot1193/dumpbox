@@ -15,7 +15,7 @@ from typing import Literal, get_args
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
-from . import db, ollama_mgr
+from . import busca, db, ollama_mgr
 from .classifier import OLLAMA_URL
 from .rules import resolver_prazo
 from .schema import Tipo
@@ -58,6 +58,10 @@ Você recebe a lista de itens (um por linha: #id | título | tipo | contexto | p
 - Perguntas ("o que tenho pra sexta?", "quais compras?"): responda usando só a lista, citando os itens. Não invente itens.
 - Quando: use as linhas "Atrasados", "Prazo hoje", "Prazo amanhã" e "Próximos 7 dias" e o rótulo entre parênteses do prazo; nunca recalcule datas.
 - "passa/muda/adia/joga X pra sexta" = mudança de prazo: acao prazo / id de X / "sexta".
+- Perguntas sobre o conteúdo das notas ("o que anotei sobre X?", "quanto vou cobrar?", "onde está Y?"): leia os
+  "ACHADOS PELA BUSCA" (título — detalhe). Todo achado cujo título ou detalhe tem X ou o assunto de X conta:
+  liste-os em frase curta com #id e título e, se a pergunta pede um dado (valor, lugar, nome), copie-o do detalhe.
+  Só quando nenhum achado tem relação, responda "Não achei nada sobre isso nas suas notas." Nunca invente.
 - Pedidos de mudança: devolva em "acoes" e explique em "resposta" (o servidor aplica e o usuário pode desfazer).
 {AJUDA_ACOES}
 Use somente ids que existem na lista. Sem pedido de mudança, acoes = [].
@@ -84,10 +88,17 @@ def duplicados(c) -> list[int]:
     return [i for ids in grupos.values() if len(ids) > 1 for i in ids[:-1]]
 
 
-def contexto_itens(c, limite: int = 60, detalhado: bool = False) -> str:
-    rows = c.execute(
-        "SELECT id,titulo,tipo,contexto,prazo_em,prioridade,estado,criado_em,detalhe FROM item WHERE estado!='arquivado' "
-        "ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+def contexto_itens(c, limite: int = 60, detalhado: bool = False, extras: list[int] = ()) -> str:
+    """Últimos `limite` itens + os achados pela busca (`extras`) + todo aberto com prazo até 7 dias (mesmo antigo)."""
+    campos = "id,titulo,tipo,contexto,prazo_em,prioridade,estado,criado_em,detalhe"
+    rows = c.execute(f"SELECT {campos} FROM item WHERE estado!='arquivado' ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+    if detalhado:
+        vistos = {r["id"] for r in rows}
+        semana = (datetime.now() + timedelta(days=8)).strftime("%Y-%m-%d")
+        ph = ",".join("?" * len(extras)) or "NULL"
+        rows += [r for r in c.execute(f"SELECT {campos} FROM item WHERE estado!='arquivado' AND (id IN ({ph}) OR "
+                                      "(estado='catalogado' AND prazo_em IS NOT NULL AND prazo_em < ?))", (*extras, semana))
+                 if r["id"] not in vistos]
 
     def prazo(p):  # modelo de 7B erra datas ISO: damos dia da semana e distância já calculados
         if not p:
@@ -288,7 +299,16 @@ def conversar(c, mensagem: str, historico: list[dict]) -> dict:
     am = agora + timedelta(days=1)
     hoje = (f"Hoje: {agora:%Y-%m-%d} ({_DIAS[agora.weekday()]}), {agora:%H:%M}. "
             f"Amanhã: {am:%Y-%m-%d} ({_DIAS[am.weekday()]}).")
-    msgs = [{"role": "system", "content": f"{SISTEMA}\n{db.texto_pastas()}\n\n{hoje}\nItens:\n{contexto_itens(c, detalhado=True)}"}]
+    try:
+        achados = busca.buscar(c, mensagem, 8)  # RAG: acha nota antiga fora dos últimos 60
+    except Exception:
+        achados = []
+    lista = contexto_itens(c, detalhado=True, extras=achados)
+    txt = {r["id"]: r for r in c.execute(f"SELECT id, titulo, detalhe FROM item WHERE id IN ({','.join('?' * len(achados)) or 'NULL'})", achados)}
+    lista += "\n\nACHADOS PELA BUSCA (mais parecidos com o pedido primeiro; podem não ter relação):\n" + (
+        "\n".join(f"#{i} {txt[i]['titulo']}" + (f" — {' '.join(txt[i]['detalhe'].split())[:200]}" if txt[i]["detalhe"] else "")
+                  for i in achados if i in txt) or "nenhum")
+    msgs = [{"role": "system", "content": f"{SISTEMA}\n{db.texto_pastas()}\n\n{hoje}\nItens:\n{lista}"}]
     msgs += [h for h in historico[-6:] if h["role"] in ("user", "assistant")]
     msgs.append({"role": "user", "content": mensagem})
     try:

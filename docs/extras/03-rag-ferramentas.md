@@ -1,5 +1,15 @@
 # Extra 3: perguntar às notas (RAG + ferramentas + memória)
 
+> **Parte feita: 3.1 (busca) e a avaliação.** `busca.py` faz a busca híbrida (0,7 cosseno + 0,3 palavras) com
+> `paraphrase-multilingual` (o `nomic-embed-text` acertou só 73% em português). Vetores ficam na tabela `embedding`,
+> e o worker indexa a cada 30 s. `chat.conversar` põe no prompt um bloco "ACHADOS PELA BUSCA" (título + detalhe),
+> além dos últimos 60 itens e de todo aberto com prazo até 7 dias.
+> Medido (`PYTHONUTF8=1 python eval/run_eval_rag.py --chat`, banco inventado de 40 itens):
+> **recall@5 22/22 (100%)**, busca p50 33 ms, recusa correta 3/3, 0 id inventado, chat p50 ~2 s (qwen2.5:7b).
+> Não feito: 3.2 ferramentas (o bloco de achados resolveu os casos medidos; fazer se a avaliação maior cair),
+> fontes clicáveis na tela e memória de conversa em tabela (os bots guardam as últimas 6 trocas em memória).
+> De quebra: `OLLAMA_URL` passou de `localhost` para `127.0.0.1`, porque no Windows o `localhost` custava ~2 s por chamada.
+
 ## Problema
 Hoje `chat.conversar` põe no prompt **os últimos 60 itens** (`contexto_itens(limite=60)`).
 Com centenas de notas, perguntas como "o que eu anotei sobre o carro em outubro?" ou
@@ -81,9 +91,9 @@ Número medido entra no README (como já se faz com a classificação).
 - Ferramentas só leem o banco do próprio usuário. Não há ferramenta de rede ou arquivo.
 
 ## Pronto quando
-- [ ] "o que anotei sobre X?" acha item de meses atrás
+- [x] "o que anotei sobre X?" acha item de meses atrás
 - [ ] `contar`/`listar_prazos` respondem com o número exato
-- [ ] Avaliação rodando com os números no README
+- [x] Avaliação rodando (números acima; README)
 - [ ] Bots usam a mesma memória de conversa
 
 ## Fora de escopo
